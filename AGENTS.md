@@ -26,7 +26,7 @@
 7. All popups which support search must enter/exit search mode using "CTRL+I"
    hotkey. Search in the popup items must be performed after input of every
    character.
-8. All popups which support selection should respond to "CTRL+X" and "ESC" to
+8. All popups which support selection should respond to "x" and "ESC" to
    close the popup, "j" to move down, "k" to move up, "b" and "ENTER" to make a
    choice.
 

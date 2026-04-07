@@ -257,13 +257,13 @@ function! s:OnPopupClosed(id, result) abort
 endfunction
 
 function! s:PopupFilter(popup_id, key) abort
-  if a:key ==# "\<Tab>" || a:key ==# "\<C-I>"
+  if a:key ==# "\<C-I>"
     let s:state.search_mode = !s:state.search_mode
     call s:RenderPopup()
     return 1
   endif
 
-  if a:key ==# "\<Esc>"
+  if a:key ==# "\<Esc>" || (!s:state.search_mode && a:key ==# 'x')
     call popup_close(a:popup_id)
     return 1
   endif
@@ -287,6 +287,11 @@ function! s:PopupFilter(popup_id, key) abort
       call s:RenderPopup()
       return 1
     endif
+  endif
+
+  if !s:state.search_mode && a:key ==# 'b'
+    call s:OpenSelectedBuffer()
+    return 1
   endif
 
   if index(['j', "\<Down>", "\<C-N>"], a:key) >= 0
@@ -352,6 +357,7 @@ function! s:OpenBuffersList() abort
         \ 'zindex': 200,
         \ })
 
+  call win_execute(s:state.popup_id, 'setlocal winhighlight=Normal:Pmenu,CursorLine:PmenuSel')
   call s:RenderPopup()
 endfunction
 
