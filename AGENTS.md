@@ -23,11 +23,19 @@
 6. All popups with titles (which is used for selecting items) have numbers in
    front of every item and display current item with * symbol, which is placed
    between the number and item.
+7. All popups which support search must enter/exit search mode using "CTRL+I"
+   hotkey. Search in the popup items must be performed after input of every
+   character.
+8. All popups which support selection should respond to "CTRL+X" and "ESC" to
+   close the popup, "j" to move down, "k" to move up, "b" and "ENTER" to make a
+   choice.
 
 # Debug Rules
 
-1. All debug operations MUST be scoped to repository directory. Never create or
+1. All operations MUST be scoped to repository directory. Never create or
    edit a file outside of repository directory.
+2. Information about vim commands and functions must be retrieved using the
+   `:help` command inside the vim. 
 
 # Asynchronous Rules
 
@@ -47,8 +55,3 @@
 3. "Build Directory" - an directory path which is composed from root directory
    path + `<output>/<preset>` values from local configuration if there is a
    `<preset>` value set. Otherwise, it is set to root directory path + `<output>`.
-
-# LOOKING FOR INFORMATION
-
-1. If you need to read Vim help, launch Vim and use the appropriate `:help`
-   command.
