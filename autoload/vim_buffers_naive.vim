@@ -356,6 +356,6 @@ function! s:OpenBuffersList() abort
   call s:RenderPopup()
 endfunction
 
-function! buffers_naive#open() abort
+function! vim_buffers_naive#open() abort
   call s:OpenBuffersList()
 endfunction
