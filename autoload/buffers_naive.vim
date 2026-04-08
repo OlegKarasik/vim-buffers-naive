@@ -11,6 +11,9 @@ let s:state = {
       \ 'query': '',
       \ }
 
+let s:popup_width = 30
+let s:max_visible_items = 10
+
 function! s:ResetState() abort
   let s:state.popup_id = -1
   let s:state.source_winid = -1
@@ -70,11 +73,7 @@ endfunction
 
 function! s:GetPopupTitle() abort
   if s:state.search_mode
-    let l:title = 'Buffers List Search'
-    if !empty(s:state.query)
-      let l:title .= ' ' . s:Truncate(s:state.query, 8)
-    endif
-    return l:title . ' (Insert)'
+    return 'Buffers List (Insert)'
   endif
   return 'Buffers List'
 endfunction
@@ -153,13 +152,13 @@ endfunction
 function! s:GetVisibleLines() abort
   if empty(s:state.filtered_indices)
     if empty(s:state.query)
-      return [s:PadToWidth('0   No file buffers', 30)]
+      return [s:PadToWidth('0   No file buffers', s:popup_width)]
     endif
-    return [s:PadToWidth('0   No matches', 30)]
+    return [s:PadToWidth('0   No matches', s:popup_width)]
   endif
 
   let l:total = len(s:state.filtered_indices)
-  let l:height = min([10, l:total])
+  let l:height = min([s:max_visible_items, l:total])
   let l:max_top = l:total - l:height
 
   if s:state.top_idx > l:max_top
@@ -182,9 +181,9 @@ function! s:GetVisibleLines() abort
     let l:buffer_index = s:state.filtered_indices[l:index]
     let l:item = s:state.all_buffers[l:buffer_index]
     let l:prefix = printf('%d %s ', l:index + 1, l:index ==# s:state.selected_idx ? '*' : ' ')
-    let l:max_name_width = 30 - strdisplaywidth(l:prefix)
+    let l:max_name_width = s:popup_width - strdisplaywidth(l:prefix)
     let l:line = l:prefix . s:Truncate(l:item.file_name, l:max_name_width)
-    call add(l:lines, s:PadToWidth(l:line, 30))
+    call add(l:lines, s:PadToWidth(l:line, s:popup_width))
   endfor
 
   return l:lines
@@ -264,13 +263,33 @@ function! s:PopupFilter(popup_id, key) abort
     return 1
   endif
 
-  if a:key ==# "\<Esc>" || (!s:state.search_mode && a:key ==# 'x')
+  if a:key ==# "\<Esc>" || a:key ==# 'x'
     call popup_close(a:popup_id)
     return 1
   endif
 
-  if a:key ==# "\<CR>"
+  if a:key ==# "\<CR>" || a:key ==# 'b'
     call s:OpenSelectedBuffer()
+    return 1
+  endif
+
+  if index(['j', "\<Down>", "\<C-N>"], a:key) >= 0
+    call s:MoveSelection(1)
+    return 1
+  endif
+
+  if index(['k', "\<Up>", "\<C-P>"], a:key) >= 0
+    call s:MoveSelection(-1)
+    return 1
+  endif
+
+  if a:key ==# "\<PageDown>"
+    call s:MoveSelection(s:max_visible_items)
+    return 1
+  endif
+
+  if a:key ==# "\<PageUp>"
+    call s:MoveSelection(-s:max_visible_items)
     return 1
   endif
 
@@ -288,31 +307,6 @@ function! s:PopupFilter(popup_id, key) abort
       call s:RenderPopup()
       return 1
     endif
-  endif
-
-  if !s:state.search_mode && a:key ==# 'b'
-    call s:OpenSelectedBuffer()
-    return 1
-  endif
-
-  if index(['j', "\<Down>", "\<C-N>"], a:key) >= 0
-    call s:MoveSelection(1)
-    return 1
-  endif
-
-  if index(['k', "\<Up>", "\<C-P>"], a:key) >= 0
-    call s:MoveSelection(-1)
-    return 1
-  endif
-
-  if a:key ==# "\<PageDown>"
-    call s:MoveSelection(10)
-    return 1
-  endif
-
-  if a:key ==# "\<PageUp>"
-    call s:MoveSelection(-10)
-    return 1
   endif
 
   return 1
@@ -343,8 +337,8 @@ function! s:OpenBuffersList() abort
   let s:state.popup_id = popup_create(l:lines, {
         \ 'title': s:GetPopupTitle(),
         \ 'pos': 'center',
-        \ 'minwidth': 30,
-        \ 'maxwidth': 30,
+        \ 'minwidth': s:popup_width,
+        \ 'maxwidth': s:popup_width,
         \ 'minheight': l:height,
         \ 'maxheight': l:height,
         \ 'padding': [0, 0, 0, 0],
