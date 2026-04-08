@@ -70,10 +70,11 @@ endfunction
 
 function! s:GetPopupTitle() abort
   if s:state.search_mode
-    if empty(s:state.query)
-      return 'Buffers List Search'
+    let l:title = 'Buffers List Search'
+    if !empty(s:state.query)
+      let l:title .= ' ' . s:Truncate(s:state.query, 8)
     endif
-    return 'Buffers List Search ' . s:Truncate(s:state.query, 8)
+    return l:title . ' (Insert)'
   endif
   return 'Buffers List'
 endfunction
