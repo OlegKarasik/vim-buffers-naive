@@ -9,9 +9,11 @@ let s:state = {
       \ 'top_idx': 0,
       \ 'search_mode': 0,
       \ 'query': '',
+      \ 'popup_width': 30,
       \ }
 
-let s:popup_width = 30
+let s:min_popup_width = 10
+let s:max_popup_width = 30
 let s:max_visible_items = 10
 
 function! s:ResetState() abort
@@ -23,6 +25,7 @@ function! s:ResetState() abort
   let s:state.top_idx = 0
   let s:state.search_mode = 0
   let s:state.query = ''
+  let s:state.popup_width = s:max_popup_width
 endfunction
 
 function! s:TrimLastChar(text) abort
@@ -69,6 +72,35 @@ function! s:PadToWidth(text, width) abort
     return a:text . repeat(' ', l:padding)
   endif
   return a:text
+endfunction
+
+function! s:ClampPopupWidth(width) abort
+  return min([s:max_popup_width, max([s:min_popup_width, a:width])])
+endfunction
+
+function! s:UpdatePopupWidth() abort
+  if empty(s:state.filtered_indices)
+    if empty(s:state.query)
+      let s:state.popup_width = s:ClampPopupWidth(strdisplaywidth('0   No file buffers'))
+      return
+    endif
+
+    let s:state.popup_width = s:ClampPopupWidth(strdisplaywidth('0   No matches'))
+    return
+  endif
+
+  let l:max_number_width = strdisplaywidth(string(len(s:state.filtered_indices)))
+  let l:prefix_width = l:max_number_width + 3
+  let l:max_name_width = 0
+
+  for l:buffer_index in s:state.filtered_indices
+    let l:name_width = strdisplaywidth(s:state.all_buffers[l:buffer_index].file_name)
+    if l:name_width > l:max_name_width
+      let l:max_name_width = l:name_width
+    endif
+  endfor
+
+  let s:state.popup_width = s:ClampPopupWidth(l:prefix_width + l:max_name_width)
 endfunction
 
 function! s:GetPopupTitle() abort
@@ -124,6 +156,7 @@ function! s:ApplyFilter() abort
   if empty(s:state.filtered_indices)
     let s:state.selected_idx = 0
     let s:state.top_idx = 0
+    call s:UpdatePopupWidth()
     return
   endif
 
@@ -147,14 +180,18 @@ function! s:ApplyFilter() abort
   if s:state.selected_idx < 0
     let s:state.selected_idx = 0
   endif
+
+  call s:UpdatePopupWidth()
 endfunction
 
 function! s:GetVisibleLines() abort
+  let l:popup_width = s:state.popup_width
+
   if empty(s:state.filtered_indices)
     if empty(s:state.query)
-      return [s:PadToWidth('0   No file buffers', s:popup_width)]
+      return [s:PadToWidth('0   No file buffers', l:popup_width)]
     endif
-    return [s:PadToWidth('0   No matches', s:popup_width)]
+    return [s:PadToWidth('0   No matches', l:popup_width)]
   endif
 
   let l:total = len(s:state.filtered_indices)
@@ -181,9 +218,9 @@ function! s:GetVisibleLines() abort
     let l:buffer_index = s:state.filtered_indices[l:index]
     let l:item = s:state.all_buffers[l:buffer_index]
     let l:prefix = printf('%d %s ', l:index + 1, l:index ==# s:state.selected_idx ? '*' : ' ')
-    let l:max_name_width = s:popup_width - strdisplaywidth(l:prefix)
+    let l:max_name_width = l:popup_width - strdisplaywidth(l:prefix)
     let l:line = l:prefix . s:Truncate(l:item.file_name, l:max_name_width)
-    call add(l:lines, s:PadToWidth(l:line, s:popup_width))
+    call add(l:lines, s:PadToWidth(l:line, l:popup_width))
   endfor
 
   return l:lines
@@ -205,6 +242,8 @@ function! s:RenderPopup() abort
   call popup_settext(s:state.popup_id, l:lines)
   call popup_setoptions(s:state.popup_id, {
         \ 'title': s:GetPopupTitle(),
+        \ 'minwidth': s:state.popup_width,
+        \ 'maxwidth': s:state.popup_width,
         \ 'minheight': l:height,
         \ 'maxheight': l:height,
         \ })
@@ -329,6 +368,7 @@ function! s:OpenBuffersList() abort
   let s:state.top_idx = 0
   let s:state.search_mode = 0
   let s:state.query = ''
+  let s:state.popup_width = s:max_popup_width
 
   call s:ApplyFilter()
   let l:lines = s:GetVisibleLines()
@@ -337,8 +377,8 @@ function! s:OpenBuffersList() abort
   let s:state.popup_id = popup_create(l:lines, {
         \ 'title': s:GetPopupTitle(),
         \ 'pos': 'center',
-        \ 'minwidth': s:popup_width,
-        \ 'maxwidth': s:popup_width,
+        \ 'minwidth': s:state.popup_width,
+        \ 'maxwidth': s:state.popup_width,
         \ 'minheight': l:height,
         \ 'maxheight': l:height,
         \ 'padding': [0, 0, 0, 0],
@@ -356,6 +396,10 @@ function! s:OpenBuffersList() abort
   call s:RenderPopup()
 endfunction
 
-function! vim_buffers_naive#open() abort
+function! vim_buffers_naive#BuffersList() abort
   call s:OpenBuffersList()
+endfunction
+
+function! vim_buffers_naive#open() abort
+  call vim_buffers_naive#BuffersList()
 endfunction
