@@ -333,6 +333,13 @@ function! s:PopupFilter(popup_id, key) abort
   endif
 
   if s:state.search_mode
+    if a:key ==# "\<C-U>"
+      let s:state.query = ''
+      call s:ApplyFilter()
+      call s:RenderPopup()
+      return 1
+    endif
+
     if a:key ==# "\<BS>" || a:key ==# "\<C-H>" || a:key ==# "\<Del>"
       let s:state.query = s:TrimLastChar(s:state.query)
       call s:ApplyFilter()
