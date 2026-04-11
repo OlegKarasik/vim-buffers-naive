@@ -9,11 +9,11 @@ let s:state = {
       \ 'top_idx': 0,
       \ 'search_mode': 0,
       \ 'query': '',
-      \ 'popup_width': 30,
+      \ 'popup_width': 100,
       \ }
 
 let s:min_popup_width = 10
-let s:max_popup_width = 30
+let s:max_popup_width = 100
 let s:max_visible_items = 10
 
 function! s:ResetState() abort
@@ -80,7 +80,7 @@ endfunction
 
 function! s:UpdatePopupWidth() abort
   if empty(s:state.filtered_indices)
-    if empty(s:state.query)
+    if empty(s:state.all_buffers)
       let s:state.popup_width = s:ClampPopupWidth(strdisplaywidth('0   No file buffers'))
       return
     endif
@@ -123,9 +123,15 @@ function! s:GetFileBuffers() abort
       continue
     endif
 
+    let l:absolute_path = fnamemodify(l:name, ':p')
+    let l:file_type = getftype(l:absolute_path)
+    if l:file_type !=# 'file' && l:file_type !=# 'link'
+      continue
+    endif
+
     call add(l:buffers, {
           \ 'bufnr': l:info.bufnr,
-          \ 'file_name': fnamemodify(l:name, ':t'),
+          \ 'file_name': fnamemodify(l:absolute_path, ':t'),
           \ })
   endfor
 
@@ -188,7 +194,7 @@ function! s:GetVisibleLines() abort
   let l:popup_width = s:state.popup_width
 
   if empty(s:state.filtered_indices)
-    if empty(s:state.query)
+    if empty(s:state.all_buffers)
       return [s:PadToWidth('0   No file buffers', l:popup_width)]
     endif
     return [s:PadToWidth('0   No matches', l:popup_width)]
@@ -281,7 +287,9 @@ function! s:OpenSelectedBuffer() abort
   endif
 
   let l:target_winid = s:state.source_winid
-  call popup_close(s:state.popup_id)
+  if s:state.popup_id > 0
+    call popup_close(s:state.popup_id)
+  endif
 
   if l:target_winid > 0 && win_gotoid(l:target_winid)
     execute 'buffer ' . l:buffer_number
@@ -307,7 +315,7 @@ function! s:PopupFilter(popup_id, key) abort
     return 1
   endif
 
-  if a:key ==# "\<CR>" || a:key ==# 'b'
+  if a:key ==# "\<CR>"
     call s:OpenSelectedBuffer()
     return 1
   endif
@@ -358,14 +366,48 @@ function! s:PopupFilter(popup_id, key) abort
   return 1
 endfunction
 
-function! s:OpenBuffersList() abort
-  if !exists('*popup_create')
-    echoerr 'BuffersList requires Vim popup support'
+function! s:OpenBuffersListFallback() abort
+  let s:state.source_winid = win_getid()
+  let s:state.all_buffers = s:GetFileBuffers()
+
+  if empty(s:state.all_buffers)
+    echomsg '0   No file buffers'
+    call s:ResetState()
     return
   endif
 
-  if s:state.popup_id > 0 && !empty(popup_getpos(s:state.popup_id))
+  let l:choices = ['Buffers List']
+  for l:index in range(len(s:state.all_buffers))
+    let l:item = s:state.all_buffers[l:index]
+    call add(l:choices, printf('%d. %s', l:index + 1, l:item.file_name))
+  endfor
+
+  let l:selection = inputlist(l:choices)
+  if l:selection <= 0 || l:selection > len(s:state.all_buffers)
+    call s:ResetState()
+    return
+  endif
+
+  let l:target_winid = s:state.source_winid
+  let l:buffer_number = s:state.all_buffers[l:selection - 1].bufnr
+  call s:ResetState()
+
+  if l:target_winid > 0 && win_gotoid(l:target_winid)
+    execute 'buffer ' . l:buffer_number
+    return
+  endif
+
+  execute 'buffer ' . l:buffer_number
+endfunction
+
+function! s:OpenBuffersList() abort
+  if s:state.popup_id > 0 && exists('*popup_getpos') && !empty(popup_getpos(s:state.popup_id))
     call popup_close(s:state.popup_id)
+  endif
+
+  if !exists('*popup_create')
+    call s:OpenBuffersListFallback()
+    return
   endif
 
   let s:state.source_winid = win_getid()

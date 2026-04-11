@@ -1,72 +1,82 @@
-# Core Rules
+# Rules
 
-1. This is an independent plugin. Never introduce dependencies for other plugins.
-2. All work must be done in boundries of the repository directory. Never create
-   scripts or files outside of repository directory. Never redirect output outside
-   of repository.
-3. All errors and warnings must be issues throught the Vim build-in errors and
-   warnings functionality.
-4. The plugin must be compatible with `vim-plug` and keep a standard Vim plugin
-   layout (`plugin/` and `autoload/`).
-5. All public executable commands must support `<Plug>(<command>)` syntax to
-   enable keybindings by default.
-6. All plugin files/internal function should be named after the plugin, for
-   instance if plugin name is `vim-buffers-naive`, then all related files should
-   be `vim_buffers_naive*`.
+1. DO NOT create or edit files outside of repository.
+2. DO NOT redirect command output into files outside of repository.
+3. DO NOT add dependencies on other plugins.
 
-# Core Popup Rules
+# File Buffers
 
-1. All popups with titles have smooth, single line borders (as modern Vim popups).
-2. All popups with titles have standard Vim popup colours for background and
-   selection.
-3. All popups with titles DO NOT have ':' at the end.
-4. All popups with titles have MAX width of 30 symbols and MIN width of 10
-   symbols.
-5. All popups which respond to "x" and "ESC" to close the popup, "j" and "DOWN" to
-   move down, "k" and "UP" to move up, "b" and "ENTER" to make a choice.
+A buffer is shown only when all conditions are true:
 
-## Popup with Selection
+1. Buffer coresponds to the physical file
 
-1. All popups with titles which are used for selecting items have DYNAMIC height
-   to keep up to 10 lines. If there are more than 10 lines, the popup scaled to 10
-   lines and supports scrolling.
-2. All popups with titles which are used for selecting items have numbers in front
-   of every item and display current item with * symbol, which is placed between
-   the number and item.
-3. All popups with titles which are used to selecting items support search must
-   enter/exit search mode using "CTRL+I" hotkey. Search in the popup items must be
-   performed after input of every character. Inside the insert mode, popup title
-   is updated to have "(Insert)" at the end. Exiting search mode retains input
-   filter. Also, in search mode popup support `CTRL+U` (to clear the filter).
+# Filter and Selection
 
-## Popup Menus
+1. Filter is case-insensitive substring match on `file_name`.
+2. Filter is reapplied after each typed character in search mode.
+3. Previous selection is preserved when possible after refilter.
+4. Empty states:
+   1. no buffers: `0   No file buffers`
+   2. no matches: `0   No matches`
 
-1. All popups with titles which are used for menus (for instance, command
-   invocation) and do no require to restore state on repeating execution MUST to
-   no an indicator of the current item `*`.
+# Source Window Restore
 
-# Debug Rules
+After confirming selection, plugin attempts to jump back to the original window
+and opens the chosen buffer there. If that window no longer exists, buffer opens
+in current window.
 
-1. All operations MUST be scoped to repository directory. Never create or
-   edit a file outside of repository directory.
-2. Information about vim commands and functions must be retrieved using the
-   `:help` command inside the vim. 
+# Commands
 
-# Asynchronous Rules
+## BuffersList
 
-1. All long running operations (invocation of external tools) must be
-   asynchronous.
-2. All asynchronous operations use vim terminal feature.
+1. Public command: `:BuffersList`.
+2. Requires popup support (`popup_create`); otherwise uses list.
+3. Closes existing plugin popup instance before opening a new one.
+4. Opens centered popup with file buffers and interactive filter/navigation.
+5. On confirm opens selected buffer.
+6. On close resets all popup state.
 
-# Concepts
+# Popups
 
-1. "Root Directory" - a directory where `CMakeLists.txt` file is located. "Root
-   Directory" is detected at runtime by searching for `CMakeLists.txt` upward
-   starting from the current directory.
-2. "Local Configuration" - a configuration file (`.vim-cmake-naive-config.json`)
-   located in the root directory.
-2. "Local Cache" - a cache file (`.vim-cmake-naive-cache.json`) located in the
-   root directory. 
-3. "Build Directory" - an directory path which is composed from root directory
-   path + `<output>/<preset>` values from local configuration if there is a
-   `<preset>` value set. Otherwise, it is set to root directory path + `<output>`.
+## Buffer Selection Popup Created by `:BuffersList`
+
+1. Visual style:
+   1. title: `Buffers List` (or `Buffers List (Insert)` in search mode)
+   2. width: dynamic `10..100`
+   3. height: dynamic `1..10` with scrolling
+   4. highlight: `Pmenu`
+   5. cursor line highlight: `PmenuSel`
+   6. border: single-line rounded (`╭╮╯╰`, `─`, `│`)
+   7. centered position
+2. Navigation keys:
+   1. `j`, `Down` - move down
+   2. `k`, `Up` - move up
+3. Action keys:
+   1. `Enter` - open selected buffer
+   2. `x` or `Esc` - close popup
+4. Search mode:
+   1. `Ctrl+I` toggles search mode
+   2. while active, printable characters append to query
+   3. query updates filtering immediately after each character
+   4. `Backspace`, `Ctrl+H`, `Del` remove one character
+   5. `Ctrl+U` clears query
+   6. leaving search mode keeps current query/filter active
+5. Key precedence:
+   1. `Esc`, `Enter` keep action behavior even in search mode.
+   2. other printable characters are treated as search input only in search mode.
+6. Rows are rendered as `<number> <marker> <file-name>`, where marker is `*` for
+   selected row.
+
+# Plug Mappings
+
+1. `<Plug>(BuffersList)` - calls `vim_buffers_naive#BuffersList()`.
+
+# Additional Public Vimscript Functions
+
+## `vim_buffers_naive#BuffersList()`
+
+Opens the buffer selection popup (same behavior as `:BuffersList`).
+
+## `vim_buffers_naive#open()`
+
+Alias that calls `vim_buffers_naive#BuffersList()`.
