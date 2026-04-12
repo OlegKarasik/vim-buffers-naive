@@ -64,8 +64,12 @@ in current window.
 5. Key precedence:
    1. `Esc`, `Enter` keep action behavior even in search mode.
    2. other printable characters are treated as search input only in search mode.
-6. Rows are rendered as `<number> <marker> <file-name>`, where marker is `*` for
-   selected row.
+6. Rows are rendered as `<number> <marker> <file-name>`, where marker is `*` is
+   set for the currently active buffer. The `<file-name>` is full path to the
+   file.
+   1. If the file is located into users directory, replace the path to the user
+      directory with the `~` symbol.
+   2. otherwise, show the full path.
 
 # Plug Mappings
 

@@ -3,6 +3,7 @@ scriptencoding utf-8
 let s:state = {
       \ 'popup_id': -1,
       \ 'source_winid': -1,
+      \ 'source_bufnr': -1,
       \ 'all_buffers': [],
       \ 'filtered_indices': [],
       \ 'selected_idx': 0,
@@ -19,6 +20,7 @@ let s:max_visible_items = 10
 function! s:ResetState() abort
   let s:state.popup_id = -1
   let s:state.source_winid = -1
+  let s:state.source_bufnr = -1
   let s:state.all_buffers = []
   let s:state.filtered_indices = []
   let s:state.selected_idx = 0
@@ -110,6 +112,33 @@ function! s:GetPopupTitle() abort
   return 'Buffers List'
 endfunction
 
+function! s:ToDisplayPath(path) abort
+  let l:absolute_path = fnamemodify(a:path, ':p')
+  let l:home_path = substitute(fnamemodify(expand('~'), ':p'), '[\/]\+$', '', '')
+
+  if empty(l:home_path)
+    return l:absolute_path
+  endif
+
+  if l:absolute_path ==# l:home_path
+    return '~'
+  endif
+
+  let l:home_prefix = l:home_path . '/'
+  if stridx(l:absolute_path, l:home_prefix) ==# 0
+    return '~/' . l:absolute_path[strlen(l:home_prefix):]
+  endif
+
+  return l:absolute_path
+endfunction
+
+function! s:GetActiveBufnr() abort
+  if s:state.source_winid > 0 && win_id2win(s:state.source_winid) > 0
+    return winbufnr(s:state.source_winid)
+  endif
+  return s:state.source_bufnr
+endfunction
+
 function! s:GetFileBuffers() abort
   let l:buffers = []
 
@@ -131,7 +160,7 @@ function! s:GetFileBuffers() abort
 
     call add(l:buffers, {
           \ 'bufnr': l:info.bufnr,
-          \ 'file_name': fnamemodify(l:absolute_path, ':t'),
+          \ 'file_name': s:ToDisplayPath(l:absolute_path),
           \ })
   endfor
 
@@ -219,11 +248,12 @@ function! s:GetVisibleLines() abort
 
   let l:lines = []
   let l:last_visible = min([l:total - 1, s:state.top_idx + l:height - 1])
+  let l:active_bufnr = s:GetActiveBufnr()
 
   for l:index in range(s:state.top_idx, l:last_visible)
     let l:buffer_index = s:state.filtered_indices[l:index]
     let l:item = s:state.all_buffers[l:buffer_index]
-    let l:prefix = printf('%d %s ', l:index + 1, l:index ==# s:state.selected_idx ? '*' : ' ')
+    let l:prefix = printf('%d %s ', l:index + 1, l:item.bufnr ==# l:active_bufnr ? '*' : ' ')
     let l:max_name_width = l:popup_width - strdisplaywidth(l:prefix)
     let l:line = l:prefix . s:Truncate(l:item.file_name, l:max_name_width)
     call add(l:lines, s:PadToWidth(l:line, l:popup_width))
@@ -368,6 +398,7 @@ endfunction
 
 function! s:OpenBuffersListFallback() abort
   let s:state.source_winid = win_getid()
+  let s:state.source_bufnr = bufnr('%')
   let s:state.all_buffers = s:GetFileBuffers()
 
   if empty(s:state.all_buffers)
@@ -411,6 +442,7 @@ function! s:OpenBuffersList() abort
   endif
 
   let s:state.source_winid = win_getid()
+  let s:state.source_bufnr = bufnr('%')
   let s:state.all_buffers = s:GetFileBuffers()
   let s:state.filtered_indices = []
   let s:state.selected_idx = 0
