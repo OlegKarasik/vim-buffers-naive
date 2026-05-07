@@ -87,7 +87,7 @@ function! s:UpdatePopupWidth() abort
       return
     endif
 
-    let s:state.popup_width = s:ClampPopupWidth(strdisplaywidth('0   No matches'))
+    let s:state.popup_width = s:ClampPopupWidth(strdisplaywidth('1.   no matches'))
     return
   endif
 
@@ -106,10 +106,14 @@ function! s:UpdatePopupWidth() abort
 endfunction
 
 function! s:GetPopupTitle() abort
-  if s:state.search_mode
-    return 'Buffers List (Insert)'
+  let l:title = 'Buffers List'
+  if !empty(s:state.query)
+    let l:title .= ' [' . s:state.query . ']'
   endif
-  return 'Buffers List'
+  if s:state.search_mode
+    let l:title .= ' (SEARCH)'
+  endif
+  return l:title
 endfunction
 
 function! s:ToDisplayPath(path) abort
@@ -226,7 +230,7 @@ function! s:GetVisibleLines() abort
     if empty(s:state.all_buffers)
       return [s:PadToWidth('0   No file buffers', l:popup_width)]
     endif
-    return [s:PadToWidth('0   No matches', l:popup_width)]
+    return [s:PadToWidth('1.   no matches', l:popup_width)]
   endif
 
   let l:total = len(s:state.filtered_indices)
@@ -334,7 +338,7 @@ function! s:OnPopupClosed(id, result) abort
 endfunction
 
 function! s:PopupFilter(popup_id, key) abort
-  if a:key ==# "\<C-I>"
+  if a:key ==# "\<C-F>"
     let s:state.search_mode = !s:state.search_mode
     call s:RenderPopup()
     return 1
@@ -378,7 +382,7 @@ function! s:PopupFilter(popup_id, key) abort
       return 1
     endif
 
-    if a:key ==# "\<BS>" || a:key ==# "\<C-H>" || a:key ==# "\<Del>"
+    if a:key ==# "\<BS>" || a:key ==# "\<C-H>" || a:key ==# "\<Del>" || a:key ==# "\<kDel>"
       let s:state.query = s:TrimLastChar(s:state.query)
       call s:ApplyFilter()
       call s:RenderPopup()

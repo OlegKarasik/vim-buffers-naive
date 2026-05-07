@@ -1,8 +1,19 @@
 # Rules
 
+These rules govern AI-agent workflow in this repository and do not define or
+constrain plugin runtime functionality.
+
 1. DO NOT create or edit files outside of repository.
 2. DO NOT redirect command output into files outside of repository.
-3. DO NOT add dependencies on other plugins.
+3. DO NOT add or take dependencies on other plugins.
+4. In tests only, any single time-based wait/check interval must not exceed 90 seconds.
+5. These global core rules override conflicting local core rules for AI-agent workflow.
+6. Global asynchronous rules in `global-async-rules.txt` (umbrella root) are mandatory and override conflicting local async rules.
+
+# Shared Popup Rules Copy
+
+1. Shared cross-repository popup rules are copied in `agents/ui/popups-shared.md`.
+2. Shared popup rules are authoritative and override conflicting local popup notes.
 
 # File Buffers
 
@@ -17,7 +28,7 @@ A buffer is shown only when all conditions are true:
 3. Previous selection is preserved when possible after refilter.
 4. Empty states:
    1. no buffers: `0   No file buffers`
-   2. no matches: `0   No matches`
+   2. no matches: `1.   no matches`
 
 # Source Window Restore
 
@@ -41,7 +52,7 @@ in current window.
 ## Buffer Selection Popup Created by `:BuffersList`
 
 1. Visual style:
-   1. title: `Buffers List` (or `Buffers List (Insert)` in search mode)
+   1. title: `Buffers List` (or `Buffers List [<query>] (SEARCH)` in search mode)
    2. width: dynamic `10..100`
    3. height: dynamic `1..10` with scrolling
    4. highlight: `Pmenu`
@@ -55,10 +66,10 @@ in current window.
    1. `Enter` - open selected buffer
    2. `x` or `Esc` - close popup
 4. Search mode:
-   1. `Ctrl+I` toggles search mode
+   1. `Ctrl+F` toggles search mode
    2. while active, printable characters append to query
    3. query updates filtering immediately after each character
-   4. `Backspace`, `Ctrl+H`, `Del` remove one character
+   4. `Backspace`, `Ctrl+H`, `Del`, `kDel` remove one character
    5. `Ctrl+U` clears query
    6. leaving search mode keeps current query/filter active
 5. Key precedence:
