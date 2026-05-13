@@ -344,7 +344,7 @@ function! s:PopupFilter(popup_id, key) abort
     return 1
   endif
 
-  if a:key ==# "\<Esc>" || a:key ==# 'x'
+  if a:key ==# "\<Esc>" || (!s:state.search_mode && a:key ==# 'x')
     call popup_close(a:popup_id)
     return 1
   endif
@@ -400,48 +400,14 @@ function! s:PopupFilter(popup_id, key) abort
   return 1
 endfunction
 
-function! s:OpenBuffersListFallback() abort
-  let s:state.source_winid = win_getid()
-  let s:state.source_bufnr = bufnr('%')
-  let s:state.all_buffers = s:GetFileBuffers()
-
-  if empty(s:state.all_buffers)
-    echomsg '0   No file buffers'
-    call s:ResetState()
-    return
-  endif
-
-  let l:choices = ['Buffers List']
-  for l:index in range(len(s:state.all_buffers))
-    let l:item = s:state.all_buffers[l:index]
-    call add(l:choices, printf('%d. %s', l:index + 1, l:item.file_name))
-  endfor
-
-  let l:selection = inputlist(l:choices)
-  if l:selection <= 0 || l:selection > len(s:state.all_buffers)
-    call s:ResetState()
-    return
-  endif
-
-  let l:target_winid = s:state.source_winid
-  let l:buffer_number = s:state.all_buffers[l:selection - 1].bufnr
-  call s:ResetState()
-
-  if l:target_winid > 0 && win_gotoid(l:target_winid)
-    execute 'buffer ' . l:buffer_number
-    return
-  endif
-
-  execute 'buffer ' . l:buffer_number
-endfunction
-
 function! s:OpenBuffersList() abort
   if s:state.popup_id > 0 && exists('*popup_getpos') && !empty(popup_getpos(s:state.popup_id))
     call popup_close(s:state.popup_id)
   endif
 
   if !exists('*popup_create')
-    call s:OpenBuffersListFallback()
+    call s:ResetState()
+    echoerr 'vim-buffers-naive: popup support is required (missing popup_create())'
     return
   endif
 

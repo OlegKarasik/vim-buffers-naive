@@ -47,7 +47,7 @@ in current window.
 ## BuffersList
 
 1. Public command: `:BuffersList`.
-2. Requires popup support (`popup_create`); otherwise uses list.
+2. Requires popup support (`popup_create`); if unavailable, command errors and stops.
 3. Closes existing plugin popup instance before opening a new one.
 4. Opens centered popup with file buffers and interactive filter/navigation.
 5. On confirm opens selected buffer.
@@ -70,7 +70,8 @@ in current window.
    2. `k`, `Up` - move up
 3. Action keys:
    1. `Enter` - open selected buffer
-   2. `x` or `Esc` - close popup
+   2. `Esc` - close popup
+   3. `x` - close popup when search mode is off
 4. Search mode:
    1. `Ctrl+F` toggles search mode
    2. while active, printable characters append to query
@@ -80,7 +81,7 @@ in current window.
    6. leaving search mode keeps current query/filter active
 5. Key precedence:
    1. `Esc`, `Enter` keep action behavior even in search mode.
-   2. other printable characters are treated as search input only in search mode.
+   2. all other printable characters (including `x`) are treated as search input in search mode.
 6. Rows are rendered as `<number> <marker> <file-name>`, where marker is `*` is
    set for the currently active buffer. The `<file-name>` is full path to the
    file.
