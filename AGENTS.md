@@ -65,6 +65,7 @@ in current window.
    5. cursor line highlight: `PmenuSel`
    6. border: single-line rounded (`╭╮╯╰`, `─`, `│`)
    7. centered position
+   8. `$PROJECT` and `$HOME` labels are highlighted with `String`
 2. Navigation keys:
    1. `j`, `Down` - move down
    2. `k`, `Up` - move up
@@ -85,9 +86,11 @@ in current window.
 6. Rows are rendered as `<number> <marker> <file-name>`, where marker is `*` is
    set for the currently active buffer. The `<file-name>` is full path to the
    file.
-   1. If the file is located into users directory, replace the path to the user
-      directory with the `~` symbol.
-   2. otherwise, show the full path.
+   1. If a `.git` directory is found while scanning parent directories up from
+      the file path, replace the project root path with the `$PROJECT` label.
+   2. If no project root is found and the file is located into users directory,
+      replace the path to the user directory with the `$HOME` label.
+   3. otherwise, show the full path.
 
 # Plug Mappings
 

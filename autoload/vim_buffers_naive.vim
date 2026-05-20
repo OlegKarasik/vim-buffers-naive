@@ -116,21 +116,52 @@ function! s:GetPopupTitle() abort
   return l:title
 endfunction
 
+function! s:FindProjectRoot(path) abort
+  let l:current_path = fnamemodify(a:path, ':p')
+  let l:directory = getftype(l:current_path) ==# 'dir' ? l:current_path : fnamemodify(l:current_path, ':h')
+
+  while !empty(l:directory)
+    if getftype(fnamemodify(l:directory . '/.git', ':p')) ==# 'dir'
+      return substitute(fnamemodify(l:directory, ':p'), '[\/]\+$', '', '')
+    endif
+
+    let l:parent = fnamemodify(l:directory, ':h')
+    if l:parent ==# l:directory
+      break
+    endif
+    let l:directory = l:parent
+  endwhile
+
+  return ''
+endfunction
+
 function! s:ToDisplayPath(path) abort
   let l:absolute_path = fnamemodify(a:path, ':p')
+  let l:project_root = s:FindProjectRoot(l:absolute_path)
   let l:home_path = substitute(fnamemodify(expand('~'), ':p'), '[\/]\+$', '', '')
+
+  if !empty(l:project_root)
+    if l:absolute_path ==# l:project_root
+      return '$PROJECT'
+    endif
+
+    let l:project_prefix = l:project_root . '/'
+    if stridx(l:absolute_path, l:project_prefix) ==# 0
+      return '$PROJECT/' . l:absolute_path[strlen(l:project_prefix):]
+    endif
+  endif
 
   if empty(l:home_path)
     return l:absolute_path
   endif
 
   if l:absolute_path ==# l:home_path
-    return '~'
+    return '$HOME'
   endif
 
   let l:home_prefix = l:home_path . '/'
   if stridx(l:absolute_path, l:home_prefix) ==# 0
-    return '~/' . l:absolute_path[strlen(l:home_prefix):]
+    return '$HOME/' . l:absolute_path[strlen(l:home_prefix):]
   endif
 
   return l:absolute_path
@@ -444,6 +475,7 @@ function! s:OpenBuffersList() abort
         \ })
 
   call win_execute(s:state.popup_id, 'setlocal winhighlight=Normal:Pmenu,CursorLine:PmenuSel')
+  call win_execute(s:state.popup_id, "call matchadd('String', '\\v\\$(PROJECT|HOME)')")
   call s:RenderPopup()
 endfunction
 
