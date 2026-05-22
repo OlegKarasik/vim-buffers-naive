@@ -486,3 +486,13 @@ endfunction
 function! vim_buffers_naive#open() abort
   call vim_buffers_naive#BuffersList()
 endfunction
+
+function! vim_buffers_naive#register_plug_mappings() abort
+  call s:register_plug_mapping('<Plug>(BuffersList)', ':<C-U>call vim_buffers_naive#BuffersList()<CR>')
+endfunction
+
+function! s:register_plug_mapping(lhs, rhs) abort
+  if empty(maparg(a:lhs, 'n'))
+    execute 'nnoremap <silent> ' . a:lhs . ' ' . a:rhs
+  endif
+endfunction
