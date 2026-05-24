@@ -71,6 +71,8 @@ in current window.
 2. Navigation keys:
    1. `j`, `Down` - move down
    2. `k`, `Up` - move up
+   3. navigation is cyclic: on the first row, `k`/`Up` jumps to the last row;
+      on the last row, `j`/`Down` jumps to the first row
 3. Action keys:
    1. `Enter` - open selected buffer
    2. `Esc` - close popup

@@ -321,19 +321,28 @@ function! s:RenderPopup() abort
   call win_execute(s:state.popup_id, printf('call cursor(%d, 1)', l:cursorline))
 endfunction
 
-function! s:MoveSelection(delta) abort
+function! s:MoveSelection(delta, ...) abort
   if empty(s:state.filtered_indices)
     return
   endif
 
+  let l:cyclic = a:0 > 0 ? a:1 : 0
   let l:last_index = len(s:state.filtered_indices) - 1
   let l:new_index = s:state.selected_idx + a:delta
 
-  if l:new_index < 0
-    let l:new_index = 0
-  endif
-  if l:new_index > l:last_index
-    let l:new_index = l:last_index
+  if l:cyclic
+    if l:new_index < 0
+      let l:new_index = l:last_index
+    elseif l:new_index > l:last_index
+      let l:new_index = 0
+    endif
+  else
+    if l:new_index < 0
+      let l:new_index = 0
+    endif
+    if l:new_index > l:last_index
+      let l:new_index = l:last_index
+    endif
   endif
 
   if l:new_index !=# s:state.selected_idx
@@ -385,13 +394,13 @@ function! s:PopupFilter(popup_id, key) abort
     return 1
   endif
 
-  if index(['j', "\<Down>", "\<C-N>"], a:key) >= 0
-    call s:MoveSelection(1)
+  if index(['j', "\<Down>"], a:key) >= 0
+    call s:MoveSelection(1, 1)
     return 1
   endif
 
-  if index(['k', "\<Up>", "\<C-P>"], a:key) >= 0
-    call s:MoveSelection(-1)
+  if index(['k', "\<Up>"], a:key) >= 0
+    call s:MoveSelection(-1, 1)
     return 1
   endif
 
