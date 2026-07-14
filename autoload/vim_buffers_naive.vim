@@ -174,7 +174,7 @@ function! s:GetActiveBufnr() abort
   return s:state.source_bufnr
 endfunction
 
-function! s:GetFileBuffers() abort
+function! s:FindFileBuffers() abort
   let l:buffers = []
 
   for l:info in getbufinfo({'buflisted': 1})
@@ -195,7 +195,21 @@ function! s:GetFileBuffers() abort
 
     call add(l:buffers, {
           \ 'bufnr': l:info.bufnr,
-          \ 'file_name': s:ToDisplayPath(l:absolute_path),
+          \ 'file_path': l:absolute_path,
+          \ 'file_name': fnamemodify(l:absolute_path, ':t'),
+          \ })
+  endfor
+
+  return l:buffers
+endfunction
+
+function! s:GetFileBuffers() abort
+  let l:buffers = []
+
+  for l:file_buffer in s:FindFileBuffers()
+    call add(l:buffers, {
+          \ 'bufnr': l:file_buffer.bufnr,
+          \ 'file_name': s:ToDisplayPath(l:file_buffer.file_path),
           \ })
   endfor
 
