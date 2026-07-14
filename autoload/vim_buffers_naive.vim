@@ -135,36 +135,25 @@ function! s:FindProjectRoot(path) abort
   return ''
 endfunction
 
-function! s:ToDisplayPath(path) abort
-  let l:absolute_path = fnamemodify(a:path, ':p')
+function! s:EnrichDisplayPath(item) abort
+  let l:enriched_item = copy(a:item)
+  let l:absolute_path = l:enriched_item.file_path
+  let l:display_path = l:absolute_path
+
   let l:project_root = s:FindProjectRoot(l:absolute_path)
-  let l:home_path = substitute(fnamemodify(expand('~'), ':p'), '[\/]\+$', '', '')
+  if !empty(l:project_root) && stridx(l:absolute_path, l:project_root) ==# 0
+    let l:display_path = '$PROJECT' . l:absolute_path[strlen(l:project_root):]
+  endif
 
-  if !empty(l:project_root)
-    if l:absolute_path ==# l:project_root
-      return '$PROJECT'
-    endif
-
-    let l:project_prefix = l:project_root . '/'
-    if stridx(l:absolute_path, l:project_prefix) ==# 0
-      return '$PROJECT/' . l:absolute_path[strlen(l:project_prefix):]
+  if l:display_path ==# l:absolute_path
+    let l:home_path = substitute(fnamemodify(expand('~'), ':p'), '[\/]\+$', '', '')
+    if !empty(l:home_path) && stridx(l:absolute_path, l:home_path) ==# 0
+      let l:display_path = '$HOME' . l:absolute_path[strlen(l:home_path):]
     endif
   endif
 
-  if empty(l:home_path)
-    return l:absolute_path
-  endif
-
-  if l:absolute_path ==# l:home_path
-    return '$HOME'
-  endif
-
-  let l:home_prefix = l:home_path . '/'
-  if stridx(l:absolute_path, l:home_prefix) ==# 0
-    return '$HOME/' . l:absolute_path[strlen(l:home_prefix):]
-  endif
-
-  return l:absolute_path
+  let l:enriched_item.display_path = l:display_path
+  return l:enriched_item
 endfunction
 
 function! s:GetActiveBufnr() abort
@@ -207,9 +196,10 @@ function! s:GetFileBuffers() abort
   let l:buffers = []
 
   for l:file_buffer in s:FindFileBuffers()
+    let l:enriched_buffer = s:EnrichDisplayPath(l:file_buffer)
     call add(l:buffers, {
-          \ 'bufnr': l:file_buffer.bufnr,
-          \ 'file_name': s:ToDisplayPath(l:file_buffer.file_path),
+          \ 'bufnr': l:enriched_buffer.bufnr,
+          \ 'file_name': l:enriched_buffer.display_path,
           \ })
   endfor
 
