@@ -135,34 +135,6 @@ function! s:FindProjectRoot(path) abort
   return ''
 endfunction
 
-function! s:EnrichDisplayPath(item) abort
-  let l:enriched_item = copy(a:item)
-  let l:absolute_path = l:enriched_item.file_path
-  let l:display_path = l:absolute_path
-
-  let l:project_root = s:FindProjectRoot(l:absolute_path)
-  if !empty(l:project_root) && stridx(l:absolute_path, l:project_root) ==# 0
-    let l:display_path = '$PROJECT' . l:absolute_path[strlen(l:project_root):]
-  endif
-
-  if l:display_path ==# l:absolute_path
-    let l:home_path = substitute(fnamemodify(expand('~'), ':p'), '[\/]\+$', '', '')
-    if !empty(l:home_path) && stridx(l:absolute_path, l:home_path) ==# 0
-      let l:display_path = '$HOME' . l:absolute_path[strlen(l:home_path):]
-    endif
-  endif
-
-  let l:enriched_item.display_path = l:display_path
-  return l:enriched_item
-endfunction
-
-function! s:GetActiveBufnr() abort
-  if s:state.source_winid > 0 && win_id2win(s:state.source_winid) > 0
-    return winbufnr(s:state.source_winid)
-  endif
-  return s:state.source_bufnr
-endfunction
-
 function! s:FindFileBuffers() abort
   let l:buffers = []
 
@@ -192,14 +164,45 @@ function! s:FindFileBuffers() abort
   return l:buffers
 endfunction
 
+function! s:EnrichFileBufferWithDisplayPath(item) abort
+  let l:enriched_item = copy(a:item)
+  let l:absolute_path = l:enriched_item.file_path
+  let l:display_path = l:absolute_path
+
+  let l:project_root = s:FindProjectRoot(l:absolute_path)
+  if !empty(l:project_root) && stridx(l:absolute_path, l:project_root) ==# 0
+    let l:display_path = '$PROJECT' . l:absolute_path[strlen(l:project_root):]
+  endif
+
+  if l:display_path ==# l:absolute_path
+    let l:home_path = substitute(fnamemodify(expand('~'), ':p'), '[\/]\+$', '', '')
+    if !empty(l:home_path) && stridx(l:absolute_path, l:home_path) ==# 0
+      let l:display_path = '$HOME' . l:absolute_path[strlen(l:home_path):]
+    endif
+  endif
+
+  let l:enriched_item.display_path = l:display_path
+  return l:enriched_item
+endfunction
+
+function! s:EnrichFileBufferWithActiveFlag(item) abort
+  let l:enriched_item = copy(a:item)
+  let l:active_bufnr = winbufnr(s:state.source_winid)
+
+  let l:enriched_item.is_active = l:enriched_item.bufnr ==# l:active_bufnr ? v:true : v:false
+  return l:enriched_item
+endfunction
+
 function! s:GetFileBuffers() abort
   let l:buffers = []
 
   for l:file_buffer in s:FindFileBuffers()
-    let l:enriched_buffer = s:EnrichDisplayPath(l:file_buffer)
+    let l:enriched_buffer = s:EnrichFileBufferWithDisplayPath(l:file_buffer)
+    let l:enriched_buffer = s:EnrichFileBufferWithActiveFlag(l:enriched_buffer)
     call add(l:buffers, {
           \ 'bufnr': l:enriched_buffer.bufnr,
           \ 'file_name': l:enriched_buffer.display_path,
+          \ 'is_active': l:enriched_buffer.is_active,
           \ })
   endfor
 
@@ -287,12 +290,11 @@ function! s:GetVisibleLines() abort
 
   let l:lines = []
   let l:last_visible = min([l:total - 1, s:state.top_idx + l:height - 1])
-  let l:active_bufnr = s:GetActiveBufnr()
 
   for l:index in range(s:state.top_idx, l:last_visible)
     let l:buffer_index = s:state.filtered_indices[l:index]
     let l:item = s:state.all_buffers[l:buffer_index]
-    let l:prefix = printf('%d %s ', l:index + 1, l:item.bufnr ==# l:active_bufnr ? '*' : ' ')
+    let l:prefix = printf('%d %s ', l:index + 1, l:item.is_active ? '*' : ' ')
     let l:max_name_width = l:popup_width - strdisplaywidth(l:prefix)
     let l:line = l:prefix . s:Truncate(l:item.file_name, l:max_name_width)
     call add(l:lines, s:PadToWidth(l:line, l:popup_width))
