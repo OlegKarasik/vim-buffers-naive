@@ -125,17 +125,23 @@ function! s:GetSelectedBufnr() abort
   return s:state.all_buffers[l:buffer_index].bufnr
 endfunction
 
-function! s:ApplyFilter() abort
-  let l:query = tolower(s:state.query)
-  let l:selected_bufnr = s:GetSelectedBufnr()
-  let s:state.filtered_indices = []
+function! s:FindFileBuffersIndexes(query, buffers) abort
+  let l:query = tolower(a:query)
+  let l:filtered_indices = []
 
-  for l:index in range(len(s:state.all_buffers))
-    let l:item = s:state.all_buffers[l:index]
+  for l:index in range(len(a:buffers))
+    let l:item = a:buffers[l:index]
     if empty(l:query) || stridx(tolower(l:item.display_path), l:query) >= 0
-      call add(s:state.filtered_indices, l:index)
+      call add(l:filtered_indices, l:index)
     endif
   endfor
+
+  return l:filtered_indices
+endfunction
+
+function! s:ApplyFilter() abort
+  let l:selected_bufnr = s:GetSelectedBufnr()
+  let s:state.filtered_indices = s:FindFileBuffersIndexes(s:state.query, s:state.all_buffers)
 
   if empty(s:state.filtered_indices)
     let s:state.selected_idx = 0
