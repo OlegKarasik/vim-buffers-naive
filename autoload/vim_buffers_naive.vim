@@ -83,11 +83,11 @@ endfunction
 function! s:UpdatePopupWidth() abort
   if empty(s:state.filtered_indices)
     if empty(s:state.all_buffers)
-      let s:state.popup_width = s:ClampPopupWidth(strdisplaywidth('0   No file buffers'))
-      return
+      let s:state.popup_width = s:ClampPopupWidth(strdisplaywidth('0.   No files'))
+    else
+      let s:state.popup_width = s:ClampPopupWidth(strdisplaywidth('1.   No file matches'))
     endif
 
-    let s:state.popup_width = s:ClampPopupWidth(strdisplaywidth('1.   no matches'))
     return
   endif
 
@@ -146,7 +146,6 @@ function! s:ApplyFilter() abort
   if empty(s:state.filtered_indices)
     let s:state.selected_idx = 0
     let s:state.top_idx = 0
-    call s:UpdatePopupWidth()
     return
   endif
 
@@ -171,49 +170,90 @@ function! s:ApplyFilter() abort
     let s:state.selected_idx = 0
   endif
 
-  call s:UpdatePopupWidth()
 endfunction
 
-function! s:GetVisibleLines() abort
-  let l:popup_width = s:state.popup_width
+function! s:GetVisibleLinesCount(filtered_indices, all_buffers, max_visible_items) abort
+  if empty(a:filtered_indices) && empty(a:all_buffers)
+    return 1
+  endif
+  if empty(a:filtered_indices)
+    return 1
+  endif
 
-  if empty(s:state.filtered_indices)
-    if empty(s:state.all_buffers)
-      return [s:PadToWidth('0   No file buffers', l:popup_width)]
+  return min([a:max_visible_items, len(a:filtered_indices)])
+endfunction
+
+function! s:CalculatePopupHeight(visible_lines_count) abort
+  return max([1, a:visible_lines_count])
+endfunction
+
+function! s:RecalculateTopIndex(top_idx, selected_idx, filtered_indices, popup_height) abort
+  if empty(a:filtered_indices)
+    return 0
+  endif
+
+  let l:top_idx = a:top_idx
+  let l:total = len(a:filtered_indices)
+  let l:max_top = l:total - a:popup_height
+
+  if l:top_idx > l:max_top
+    let l:top_idx = l:max_top
+  endif
+  if l:top_idx < 0
+    let l:top_idx = 0
+  endif
+  if a:selected_idx < l:top_idx
+    let l:top_idx = a:selected_idx
+  endif
+  if a:selected_idx >= (l:top_idx + a:popup_height)
+    let l:top_idx = a:selected_idx - a:popup_height + 1
+  endif
+
+  return l:top_idx
+endfunction
+
+function! s:BuildVisibleLines(filtered_indices, all_buffers, top_idx, popup_height, popup_width) abort
+  if empty(a:filtered_indices)
+    if empty(a:all_buffers)
+      return [s:PadToWidth('0   No file buffers', a:popup_width)]
     endif
-    return [s:PadToWidth('1.   no matches', l:popup_width)]
-  endif
-
-  let l:total = len(s:state.filtered_indices)
-  let l:height = min([s:max_visible_items, l:total])
-  let l:max_top = l:total - l:height
-
-  if s:state.top_idx > l:max_top
-    let s:state.top_idx = l:max_top
-  endif
-  if s:state.top_idx < 0
-    let s:state.top_idx = 0
-  endif
-  if s:state.selected_idx < s:state.top_idx
-    let s:state.top_idx = s:state.selected_idx
-  endif
-  if s:state.selected_idx >= (s:state.top_idx + l:height)
-    let s:state.top_idx = s:state.selected_idx - l:height + 1
+    return [s:PadToWidth('1.   no matches', a:popup_width)]
   endif
 
   let l:lines = []
-  let l:last_visible = min([l:total - 1, s:state.top_idx + l:height - 1])
+  let l:last_visible = min([len(a:filtered_indices) - 1, a:top_idx + a:popup_height - 1])
 
-  for l:index in range(s:state.top_idx, l:last_visible)
-    let l:buffer_index = s:state.filtered_indices[l:index]
-    let l:item = s:state.all_buffers[l:buffer_index]
+  for l:index in range(a:top_idx, l:last_visible)
+    let l:buffer_index = a:filtered_indices[l:index]
+    let l:item = a:all_buffers[l:buffer_index]
     let l:prefix = printf('%d %s ', l:index + 1, l:item.is_active ? '*' : ' ')
-    let l:max_name_width = l:popup_width - strdisplaywidth(l:prefix)
+    let l:max_name_width = a:popup_width - strdisplaywidth(l:prefix)
     let l:line = l:prefix . s:Truncate(l:item.display_path, l:max_name_width)
-    call add(l:lines, s:PadToWidth(l:line, l:popup_width))
+    call add(l:lines, s:PadToWidth(l:line, a:popup_width))
   endfor
 
   return l:lines
+endfunction
+
+function! s:GetVisibleLines() abort
+  let l:visible_lines_count = s:GetVisibleLinesCount(
+        \ s:state.filtered_indices,
+        \ s:state.all_buffers,
+        \ s:max_visible_items)
+  let l:popup_height = s:CalculatePopupHeight(l:visible_lines_count)
+
+  let s:state.top_idx = s:RecalculateTopIndex(
+        \ s:state.top_idx,
+        \ s:state.selected_idx,
+        \ s:state.filtered_indices,
+        \ l:popup_height)
+
+  return s:BuildVisibleLines(
+        \ s:state.filtered_indices,
+        \ s:state.all_buffers,
+        \ s:state.top_idx,
+        \ l:popup_height,
+        \ s:state.popup_width)
 endfunction
 
 function! s:RenderPopup() abort
@@ -337,6 +377,7 @@ function! s:PopupFilter(popup_id, key) abort
     if a:key ==# "\<C-U>"
       let s:state.query = ''
       call s:ApplyFilter()
+      call s:UpdatePopupWidth()
       call s:RenderPopup()
       return 1
     endif
@@ -344,6 +385,7 @@ function! s:PopupFilter(popup_id, key) abort
     if a:key ==# "\<BS>" || a:key ==# "\<C-H>" || a:key ==# "\<Del>" || a:key ==# "\<kDel>"
       let s:state.query = s:TrimLastChar(s:state.query)
       call s:ApplyFilter()
+      call s:UpdatePopupWidth()
       call s:RenderPopup()
       return 1
     endif
@@ -351,6 +393,7 @@ function! s:PopupFilter(popup_id, key) abort
     if strlen(a:key) ==# 1 && char2nr(a:key) >= 32
       let s:state.query .= a:key
       call s:ApplyFilter()
+      call s:UpdatePopupWidth()
       call s:RenderPopup()
       return 1
     endif
@@ -404,6 +447,8 @@ function! s:OpenBuffersList() abort
 
   call win_execute(s:state.popup_id, 'setlocal winhighlight=Normal:Pmenu,CursorLine:PmenuSel')
   call win_execute(s:state.popup_id, "call matchadd('String', '\\v\\$(PROJECT|HOME)')")
+
+  call s:UpdatePopupWidth()
   call s:RenderPopup()
 endfunction
 
