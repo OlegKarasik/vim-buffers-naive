@@ -81,28 +81,31 @@ function! s:ClampPopupWidth(width) abort
 endfunction
 
 function! s:UpdatePopupWidth() abort
-  if empty(s:state.filtered_indices)
-    if empty(s:state.all_buffers)
-      let s:state.popup_width = s:ClampPopupWidth(strdisplaywidth('0.   No files'))
-    else
-      let s:state.popup_width = s:ClampPopupWidth(strdisplaywidth('1.   No file matches'))
-    endif
+  let l:max_number_width = 0
+  let l:max_name_width   = 0
 
-    return
+  if empty(s:state.filtered_indices)
+    let l:max_number_width = 1
+
+    if empty(s:state.all_buffers)
+      let l:max_name_width = strdisplaywidth('0.   No files')
+    else
+      let l:max_name_width = strdisplaywidth('1.   No files match')
+    endif
+  else
+    let l:max_number_width = strdisplaywidth(string(len(s:state.filtered_indices)))
+    let l:max_name_width   = 0
+
+    for l:buffer_index in s:state.filtered_indices
+      let l:name_width = strdisplaywidth(s:state.all_buffers[l:buffer_index].display_path)
+      if l:name_width > l:max_name_width
+        let l:max_name_width = l:name_width
+      endif
+    endfor
   endif
 
-  let l:max_number_width = strdisplaywidth(string(len(s:state.filtered_indices)))
-  let l:prefix_width = l:max_number_width + 3
-  let l:max_name_width = 0
-
-  for l:buffer_index in s:state.filtered_indices
-    let l:name_width = strdisplaywidth(s:state.all_buffers[l:buffer_index].display_path)
-    if l:name_width > l:max_name_width
-      let l:max_name_width = l:name_width
-    endif
-  endfor
-
-  let s:state.popup_width = s:ClampPopupWidth(l:prefix_width + l:max_name_width)
+  let l:prefix_width      = l:max_number_width + 3
+  let s:state.popup_width = min([s:max_popup_width, max([s:min_popup_width, l:prefix_width + l:max_name_width])])
 endfunction
 
 function! s:GetPopupTitle() abort
