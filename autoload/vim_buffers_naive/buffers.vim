@@ -55,7 +55,12 @@ function! s:EnrichFileBufferWithDisplayPath(item) abort
 
   let l:project_root = s:FindProjectRoot(l:absolute_path)
   if !empty(l:project_root) && stridx(l:absolute_path, l:project_root) ==# 0
-    let l:display_path = '$PROJECT' . l:absolute_path[strlen(l:project_root):]
+    let l:cwd_path = substitute(fnamemodify(getcwd(), ':p'), '[\/]\+$', '', '')
+    if stridx(l:cwd_path, l:project_root) ==# 0 && stridx(l:absolute_path, l:cwd_path) ==# 0
+      let l:display_path = '$CWD' . l:absolute_path[strlen(l:cwd_path):]
+    else
+      let l:display_path = '$PROJECT' . l:absolute_path[strlen(l:project_root):]
+    endif
   endif
 
   if l:display_path ==# l:absolute_path

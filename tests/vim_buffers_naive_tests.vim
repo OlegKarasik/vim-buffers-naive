@@ -180,6 +180,40 @@ function! s:test_get_file_buffers_rewrites_project_root_prefix() abort
   endtry
 endfunction
 
+function! s:test_get_file_buffers_prefers_cwd_prefix_inside_project() abort
+  let l:fixture_dir = s:create_fixture_directory('cwd-label-inside-project')
+  let l:project_root = l:fixture_dir . '/sample-project'
+  let l:cwd_root = l:project_root . '/module'
+  let l:file_path = l:cwd_root . '/src/main.txt'
+  let l:original_cwd = getcwd()
+
+  try
+    call s:reset_ui_state()
+    call mkdir(l:project_root . '/.git', 'p')
+    call mkdir(fnamemodify(l:file_path, ':h'), 'p')
+    call writefile(['main'], l:file_path)
+    execute 'cd ' . fnameescape(l:cwd_root)
+    execute 'edit ' . fnameescape(l:file_path)
+
+    let l:buffers = vim_buffers_naive#buffers#GetFileBuffers(win_getid())
+    let l:item = s:find_buffer_item_by_path(l:buffers, l:file_path)
+
+    let l:normalized_cwd = substitute(s:normalize_path(l:cwd_root), '[\/]\+$', '', '')
+    let l:normalized_path = s:normalize_path(l:file_path)
+    let l:expected_display_path = '$CWD' . l:normalized_path[strlen(l:normalized_cwd):]
+
+    call assert_false(empty(l:item), 'Expected GetFileBuffers to include the nested project file.')
+    call assert_equal(
+          \ l:expected_display_path,
+          \ l:item.display_path,
+          \ 'Expected display_path to prefer $CWD when cwd is inside the project.')
+  finally
+    execute 'cd ' . fnameescape(l:original_cwd)
+    call s:reset_ui_state()
+    call s:cleanup_directory(l:fixture_dir)
+  endtry
+endfunction
+
 function! s:test_buffers_list_shows_empty_state_when_no_file_buffers() abort
   try
     call s:reset_ui_state()
@@ -262,6 +296,7 @@ function! VimBuffersNaiveTestRunAll() abort
   call s:test_buffers_list_plug_mapping_does_not_override_existing_lhs()
   call s:test_get_file_buffers_collects_files_and_marks_active()
   call s:test_get_file_buffers_rewrites_project_root_prefix()
+  call s:test_get_file_buffers_prefers_cwd_prefix_inside_project()
   call s:test_buffers_list_shows_empty_state_when_no_file_buffers()
   call s:test_buffers_list_filter_is_case_insensitive()
   call s:test_buffers_list_enter_opens_selected_buffer()

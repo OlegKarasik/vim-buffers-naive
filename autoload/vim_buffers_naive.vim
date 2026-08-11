@@ -449,7 +449,7 @@ function! s:OpenBuffersList() abort
         \ })
 
   call win_execute(s:state.popup_id, 'setlocal winhighlight=Normal:Pmenu,CursorLine:PmenuSel')
-  call win_execute(s:state.popup_id, "call matchadd('String', '\\v\\$(PROJECT|HOME)')")
+  call win_execute(s:state.popup_id, "call matchadd('String', '\\v\\$(PROJECT|CWD|HOME)')")
 
   call s:UpdatePopupWidth()
   call s:RenderPopup()
