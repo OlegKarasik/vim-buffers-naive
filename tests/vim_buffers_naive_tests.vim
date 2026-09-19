@@ -214,6 +214,23 @@ function! s:test_get_file_buffers_prefers_cwd_prefix_inside_project() abort
   endtry
 endfunction
 
+function! s:test_enrich_file_buffer_with_display_index_zero_pads_value() abort
+  call vim_buffers_naive#buffers#GetFileBuffers(win_getid())
+  let l:EnrichFileBufferWithDisplayIndex = s:autoload_script_local_function('EnrichFileBufferWithDisplayIndex')
+
+  let l:item = {
+        \ 'bufnr': 1,
+        \ 'file_path': '/tmp/example.txt',
+        \ 'file_name': 'example.txt',
+        \ }
+  let l:enriched_item = call(l:EnrichFileBufferWithDisplayIndex, [l:item, 4, 15])
+
+  call assert_equal(
+        \ '04',
+        \ l:enriched_item.display_index,
+        \ 'Expected display_index to be zero-padded to total items width.')
+endfunction
+
 function! s:test_buffers_list_shows_empty_state_when_no_file_buffers() abort
   try
     call s:reset_ui_state()
@@ -297,6 +314,7 @@ function! VimBuffersNaiveTestRunAll() abort
   call s:test_get_file_buffers_collects_files_and_marks_active()
   call s:test_get_file_buffers_rewrites_project_root_prefix()
   call s:test_get_file_buffers_prefers_cwd_prefix_inside_project()
+  call s:test_enrich_file_buffer_with_display_index_zero_pads_value()
   call s:test_buffers_list_shows_empty_state_when_no_file_buffers()
   call s:test_buffers_list_filter_is_case_insensitive()
   call s:test_buffers_list_enter_opens_selected_buffer()

@@ -33,7 +33,7 @@ function! s:FindFileBuffers() abort
     endif
 
     let l:absolute_path = fnamemodify(l:name, ':p')
-    let l:file_type = getftype(l:absolute_path)
+    let l:file_type     = getftype(l:absolute_path)
     if l:file_type !=# 'file' && l:file_type !=# 'link'
       continue
     endif
@@ -80,12 +80,29 @@ function! s:EnrichFileBufferWithActiveFlag(item, source_winid) abort
   return l:enriched_item
 endfunction
 
+function! s:EnrichFileBufferWithDisplayIndex(item, item_index, total_items) abort
+  let l:enriched_item = copy(a:item)
+
+  let l:display_index_len = len(string(a:total_items))
+  let l:display_index_fmt = '%0' . string(l:display_index_len) . 'd'
+  let l:display_index     = printf(l:display_index_fmt, a:item_index)
+
+  let l:enriched_item.display_index = l:display_index
+  return l:enriched_item
+endfunction
+
 function! vim_buffers_naive#buffers#GetFileBuffers(source_winid) abort
+  let l:file_buffers = s:FindFileBuffers()
+
   let l:buffers = []
 
-  for l:file_buffer in s:FindFileBuffers()
+  for i in range(0, len(l:file_buffers) - 1)
+    let l:file_buffer = l:file_buffers[i]
+
     let l:enriched_buffer = s:EnrichFileBufferWithDisplayPath(l:file_buffer)
+    let l:enriched_buffer = s:EnrichFileBufferWithDisplayIndex(l:enriched_buffer, i, len(l:file_buffers))
     let l:enriched_buffer = s:EnrichFileBufferWithActiveFlag(l:enriched_buffer, a:source_winid)
+
     call add(l:buffers, l:enriched_buffer)
   endfor
 
