@@ -100,7 +100,7 @@ function! vim_buffers_naive#buffers#GetFileBuffers(source_winid) abort
     let l:file_buffer = l:file_buffers[i]
 
     let l:enriched_buffer = s:EnrichFileBufferWithDisplayPath(l:file_buffer)
-    let l:enriched_buffer = s:EnrichFileBufferWithDisplayIndex(l:enriched_buffer, i, len(l:file_buffers))
+    let l:enriched_buffer = s:EnrichFileBufferWithDisplayIndex(l:enriched_buffer, i + 1, len(l:file_buffers))
     let l:enriched_buffer = s:EnrichFileBufferWithActiveFlag(l:enriched_buffer, a:source_winid)
 
     call add(l:buffers, l:enriched_buffer)

@@ -76,10 +76,6 @@ function! s:PadToWidth(text, width) abort
   return a:text
 endfunction
 
-function! s:ClampPopupWidth(width) abort
-  return min([s:max_popup_width, max([s:min_popup_width, a:width])])
-endfunction
-
 function! s:UpdatePopupWidth() abort
   let l:max_number_width = 0
   let l:max_name_width   = 0
@@ -229,7 +225,7 @@ function! s:BuildVisibleLines(filtered_indices, all_buffers, top_idx, popup_heig
   for l:index in range(a:top_idx, l:last_visible)
     let l:buffer_index = a:filtered_indices[l:index]
     let l:item = a:all_buffers[l:buffer_index]
-    let l:prefix = printf('%d %s ', l:index + 1, l:item.is_active ? '*' : ' ')
+    let l:prefix = printf('%s %s ', l:item.display_index, l:item.is_active ? '*' : ' ')
     let l:max_name_width = a:popup_width - strdisplaywidth(l:prefix)
     let l:line = l:prefix . s:Truncate(l:item.display_path, l:max_name_width)
     call add(l:lines, s:PadToWidth(l:line, a:popup_width))
