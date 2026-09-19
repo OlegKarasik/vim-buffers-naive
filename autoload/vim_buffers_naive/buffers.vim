@@ -51,22 +51,20 @@ endfunction
 function! s:EnrichFileBufferWithDisplayPath(item) abort
   let l:enriched_item = copy(a:item)
   let l:absolute_path = l:enriched_item.file_path
-  let l:display_path = l:absolute_path
+  let l:display_path  = l:absolute_path
+
+  let l:home_path = substitute(fnamemodify(expand('~'), ':p'), '[\/]\+$', '', '')
+  if !empty(l:home_path) && stridx(l:absolute_path, l:home_path) ==# 0
+    let l:display_path = '$HOME' . l:absolute_path[strlen(l:home_path):]
+  endif
 
   let l:project_root = s:FindProjectRoot(l:absolute_path)
   if !empty(l:project_root) && stridx(l:absolute_path, l:project_root) ==# 0
     let l:cwd_path = substitute(fnamemodify(getcwd(), ':p'), '[\/]\+$', '', '')
-    if stridx(l:cwd_path, l:project_root) ==# 0 && stridx(l:absolute_path, l:cwd_path) ==# 0
+    if stridx(l:cwd_path, l:project_root) ==# 0
       let l:display_path = '$CWD' . l:absolute_path[strlen(l:cwd_path):]
     else
       let l:display_path = '$PROJECT' . l:absolute_path[strlen(l:project_root):]
-    endif
-  endif
-
-  if l:display_path ==# l:absolute_path
-    let l:home_path = substitute(fnamemodify(expand('~'), ':p'), '[\/]\+$', '', '')
-    if !empty(l:home_path) && stridx(l:absolute_path, l:home_path) ==# 0
-      let l:display_path = '$HOME' . l:absolute_path[strlen(l:home_path):]
     endif
   endif
 
