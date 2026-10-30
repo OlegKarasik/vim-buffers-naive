@@ -16,6 +16,7 @@ let s:state = {
 let s:min_popup_width = 10
 let s:max_popup_width = 100
 let s:max_visible_items = 10
+let s:previous_buffers = []
 
 function! s:ResetState() abort
   let s:state.popup_id = -1
@@ -414,7 +415,8 @@ function! s:OpenBuffersList() abort
 
   let s:state.source_winid = win_getid()
   let s:state.source_bufnr = bufnr('%')
-  let s:state.all_buffers = vim_buffers_naive#buffers#GetFileBuffers(s:state.source_winid)
+  let s:state.all_buffers = vim_buffers_naive#buffers#GetFileBuffers(s:previous_buffers, s:state.source_winid)
+  let s:previous_buffers = copy(s:state.all_buffers)
   let s:state.filtered_indices = []
   let s:state.selected_idx = 0
   let s:state.top_idx = 0

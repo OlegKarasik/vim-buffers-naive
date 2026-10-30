@@ -71,6 +71,14 @@ function! s:find_buffer_item_by_path(buffers, target_path) abort
   return {}
 endfunction
 
+function! s:get_buffer_paths(buffers) abort
+  let l:paths = []
+  for l:item in a:buffers
+    call add(l:paths, s:normalize_path(get(l:item, 'file_path', '')))
+  endfor
+  return l:paths
+endfunction
+
 function! s:open_buffers_list_popup() abort
   call s:close_all_popups()
   let l:before_ids = popup_list()
@@ -134,7 +142,7 @@ function! s:test_get_file_buffers_collects_files_and_marks_active() abort
     execute 'edit ' . fnameescape(l:file_one)
     execute 'badd ' . fnameescape(l:file_two)
 
-    let l:buffers = vim_buffers_naive#buffers#GetFileBuffers(win_getid())
+    let l:buffers = vim_buffers_naive#buffers#GetFileBuffers([], win_getid())
     let l:item_one = s:find_buffer_item_by_path(l:buffers, l:file_one)
     let l:item_two = s:find_buffer_item_by_path(l:buffers, l:file_two)
 
@@ -144,6 +152,87 @@ function! s:test_get_file_buffers_collects_files_and_marks_active() abort
     call assert_equal(v:false, l:item_two.is_active, 'Expected non-current buffer to be marked inactive.')
     call assert_equal('alpha.txt', l:item_one.file_name, 'Expected file_name to match first file basename.')
     call assert_equal('beta.txt', l:item_two.file_name, 'Expected file_name to match second file basename.')
+  finally
+    call s:reset_ui_state()
+    call s:cleanup_directory(l:fixture_dir)
+  endtry
+endfunction
+
+function! s:test_get_file_buffers_reverses_without_previous_and_keeps_active_first() abort
+  let l:fixture_dir = s:create_fixture_directory('get-file-buffers-reverse')
+  let l:file_one = l:fixture_dir . '/alpha.txt'
+  let l:file_two = l:fixture_dir . '/beta.txt'
+  let l:file_three = l:fixture_dir . '/gamma.txt'
+
+  try
+    call s:reset_ui_state()
+    call writefile(['alpha'], l:file_one)
+    call writefile(['beta'], l:file_two)
+    call writefile(['gamma'], l:file_three)
+
+    execute 'edit ' . fnameescape(l:file_one)
+    execute 'badd ' . fnameescape(l:file_two)
+    execute 'badd ' . fnameescape(l:file_three)
+    execute 'buffer ' . bufnr(l:file_two)
+
+    let l:buffers = vim_buffers_naive#buffers#GetFileBuffers([], win_getid())
+    let l:expected = [
+          \ s:normalize_path(l:file_two),
+          \ s:normalize_path(l:file_three),
+          \ s:normalize_path(l:file_one),
+          \ ]
+
+    call assert_equal(
+          \ l:expected,
+          \ s:get_buffer_paths(l:buffers),
+          \ 'Expected reverse order with active buffer pinned to the first item.')
+    call assert_equal(v:true, l:buffers[0].is_active, 'Expected first item to be the active buffer.')
+  finally
+    call s:reset_ui_state()
+    call s:cleanup_directory(l:fixture_dir)
+  endtry
+endfunction
+
+function! s:test_get_file_buffers_merges_previous_and_prepends_new_reversed() abort
+  let l:fixture_dir = s:create_fixture_directory('get-file-buffers-merge')
+  let l:file_alpha = l:fixture_dir . '/alpha.txt'
+  let l:file_beta = l:fixture_dir . '/beta.txt'
+  let l:file_gamma = l:fixture_dir . '/gamma.txt'
+  let l:file_delta = l:fixture_dir . '/delta.txt'
+  let l:file_epsilon = l:fixture_dir . '/epsilon.txt'
+
+  try
+    call s:reset_ui_state()
+    call writefile(['alpha'], l:file_alpha)
+    call writefile(['beta'], l:file_beta)
+    call writefile(['gamma'], l:file_gamma)
+    call writefile(['delta'], l:file_delta)
+    call writefile(['epsilon'], l:file_epsilon)
+
+    execute 'edit ' . fnameescape(l:file_alpha)
+    execute 'badd ' . fnameescape(l:file_beta)
+    execute 'badd ' . fnameescape(l:file_gamma)
+    execute 'buffer ' . bufnr(l:file_beta)
+
+    let l:previous_buffers = vim_buffers_naive#buffers#GetFileBuffers([], win_getid())
+
+    execute 'silent! bwipeout! ' . bufnr(l:file_gamma)
+    execute 'badd ' . fnameescape(l:file_delta)
+    execute 'badd ' . fnameescape(l:file_epsilon)
+    execute 'buffer ' . bufnr(l:file_alpha)
+
+    let l:buffers = vim_buffers_naive#buffers#GetFileBuffers(l:previous_buffers, win_getid())
+    let l:expected = [
+          \ s:normalize_path(l:file_alpha),
+          \ s:normalize_path(l:file_epsilon),
+          \ s:normalize_path(l:file_delta),
+          \ s:normalize_path(l:file_beta),
+          \ ]
+
+    call assert_equal(
+          \ l:expected,
+          \ s:get_buffer_paths(l:buffers),
+          \ 'Expected active buffer first, then new buffers reversed, then prior buffers that still exist.')
   finally
     call s:reset_ui_state()
     call s:cleanup_directory(l:fixture_dir)
@@ -162,7 +251,7 @@ function! s:test_get_file_buffers_rewrites_project_root_prefix() abort
     call writefile(['main'], l:file_path)
     execute 'edit ' . fnameescape(l:file_path)
 
-    let l:buffers = vim_buffers_naive#buffers#GetFileBuffers(win_getid())
+    let l:buffers = vim_buffers_naive#buffers#GetFileBuffers([], win_getid())
     let l:item = s:find_buffer_item_by_path(l:buffers, l:file_path)
 
     let l:normalized_root = substitute(s:normalize_path(l:project_root), '[\/]\+$', '', '')
@@ -195,7 +284,7 @@ function! s:test_get_file_buffers_prefers_cwd_prefix_inside_project() abort
     execute 'cd ' . fnameescape(l:cwd_root)
     execute 'edit ' . fnameescape(l:file_path)
 
-    let l:buffers = vim_buffers_naive#buffers#GetFileBuffers(win_getid())
+    let l:buffers = vim_buffers_naive#buffers#GetFileBuffers([], win_getid())
     let l:item = s:find_buffer_item_by_path(l:buffers, l:file_path)
 
     let l:normalized_cwd = substitute(s:normalize_path(l:cwd_root), '[\/]\+$', '', '')
@@ -215,7 +304,7 @@ function! s:test_get_file_buffers_prefers_cwd_prefix_inside_project() abort
 endfunction
 
 function! s:test_enrich_file_buffer_with_display_index_zero_pads_value() abort
-  call vim_buffers_naive#buffers#GetFileBuffers(win_getid())
+  call vim_buffers_naive#buffers#GetFileBuffers([], win_getid())
   let l:EnrichFileBufferWithDisplayIndex = s:autoload_script_local_function('EnrichFileBufferWithDisplayIndex')
 
   let l:item = {
@@ -312,6 +401,8 @@ function! VimBuffersNaiveTestRunAll() abort
   call s:test_buffers_list_plug_mapping_is_defined()
   call s:test_buffers_list_plug_mapping_does_not_override_existing_lhs()
   call s:test_get_file_buffers_collects_files_and_marks_active()
+  call s:test_get_file_buffers_reverses_without_previous_and_keeps_active_first()
+  call s:test_get_file_buffers_merges_previous_and_prepends_new_reversed()
   call s:test_get_file_buffers_rewrites_project_root_prefix()
   call s:test_get_file_buffers_prefers_cwd_prefix_inside_project()
   call s:test_enrich_file_buffer_with_display_index_zero_pads_value()

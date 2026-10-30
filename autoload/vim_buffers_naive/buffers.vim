@@ -72,14 +72,6 @@ function! s:EnrichFileBufferWithDisplayPath(item) abort
   return l:enriched_item
 endfunction
 
-function! s:EnrichFileBufferWithActiveFlag(item, source_winid) abort
-  let l:enriched_item = copy(a:item)
-  let l:active_bufnr = winbufnr(a:source_winid)
-
-  let l:enriched_item.is_active = l:enriched_item.bufnr ==# l:active_bufnr ? v:true : v:false
-  return l:enriched_item
-endfunction
-
 function! s:EnrichFileBufferWithDisplayIndex(item, item_index, total_items) abort
   let l:enriched_item = copy(a:item)
 
@@ -91,20 +83,58 @@ function! s:EnrichFileBufferWithDisplayIndex(item, item_index, total_items) abor
   return l:enriched_item
 endfunction
 
-function! vim_buffers_naive#buffers#GetFileBuffers(source_winid) abort
-  let l:file_buffers = s:FindFileBuffers()
+function! s:EnrichFileBufferWithActiveFlag(item, source_winid) abort
+  let l:enriched_item = copy(a:item)
+  let l:active_bufnr = winbufnr(a:source_winid)
 
-  let l:buffers = []
+  let l:enriched_item.is_active = l:enriched_item.bufnr ==# l:active_bufnr ? v:true : v:false
+  return l:enriched_item
+endfunction
 
-  for i in range(0, len(l:file_buffers) - 1)
-    let l:file_buffer = l:file_buffers[i]
+function! vim_buffers_naive#buffers#GetFileBuffers(previous_buffers, source_winid) abort
+  let l:buffers = s:FindFileBuffers()
 
-    let l:enriched_buffer = s:EnrichFileBufferWithDisplayPath(l:file_buffer)
-    let l:enriched_buffer = s:EnrichFileBufferWithDisplayIndex(l:enriched_buffer, i + 1, len(l:file_buffers))
-    let l:enriched_buffer = s:EnrichFileBufferWithActiveFlag(l:enriched_buffer, a:source_winid)
+  let l:active = v:null
 
-    call add(l:buffers, l:enriched_buffer)
+  let l:output = []
+
+  let l:mapping = {}
+  let l:previous_mapping = {}
+  for i in range(0, len(a:previous_buffers) - 1)
+    let l:previous_mapping[a:previous_buffers[i].file_path] = a:previous_buffers[i]
+  endfor
+  for i in range(0, len(l:buffers) - 1)
+    let l:buffers[i] = s:EnrichFileBufferWithActiveFlag(l:buffers[i], a:source_winid)
+    if  l:buffers[i].is_active is v:true
+      let l:active = l:buffers[i]
+    endif
+    let l:mapping[l:buffers[i].file_path] = l:buffers[i]
   endfor
 
-  return l:buffers
+  for i in range(0, len(a:previous_buffers) - 1)
+    let l:val = get(l:mapping, a:previous_buffers[i].file_path, v:null)
+    if l:val isnot v:null
+      if l:active is v:null || a:previous_buffers[i].file_path !=? l:active.file_path
+        call add(l:output, l:val)
+      endif
+    endif
+  endfor
+  for i in range(0, len(l:buffers) - 1)
+    let l:val = get(l:previous_mapping, l:buffers[i].file_path, v:null)
+    if l:val is v:null
+      if l:active is v:null || l:buffers[i].file_path !=? l:active.file_path
+        call insert(l:output, l:buffers[i], 0)
+      endif
+    endif
+  endfor
+  if l:active isnot v:null
+    call insert(l:output, l:active, 0)
+  endif
+
+  for i in range(0, len(l:output) - 1)
+    let l:output[i] = s:EnrichFileBufferWithDisplayPath (l:output[i])
+    let l:output[i] = s:EnrichFileBufferWithDisplayIndex(l:output[i], i + 1, len(l:output))
+  endfor
+
+  return l:output
 endfunction
