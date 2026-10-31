@@ -437,7 +437,7 @@ function! s:OpenBuffersList() abort
         \ 'maxheight': l:height,
         \ 'padding': [0, 0, 0, 0],
         \ 'border': [1, 1, 1, 1],
-        \ 'borderchars': ['─', '│', '─', '│', '╭', '╮', '╯', '╰'],
+        \ 'borderchars': ['─', '│', '─', '│', '┌', '┐', '┘', '└'],
         \ 'mapping': 0,
         \ 'filter': function('s:PopupFilter'),
         \ 'callback': function('s:OnPopupClosed'),
