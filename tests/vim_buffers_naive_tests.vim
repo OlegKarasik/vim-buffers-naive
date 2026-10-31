@@ -335,30 +335,21 @@ function! s:test_buffers_list_shows_empty_state_when_no_file_buffers() abort
   endtry
 endfunction
 
-function! s:test_buffers_list_filter_is_case_insensitive() abort
-  let l:fixture_dir = s:create_fixture_directory('filter-case-insensitive')
+function! s:test_buffers_list_x_closes_popup() abort
+  let l:fixture_dir = s:create_fixture_directory('close-popup-with-x')
   let l:file_one = l:fixture_dir . '/alpha.txt'
-  let l:file_two = l:fixture_dir . '/Beta.txt'
 
   try
     call s:reset_ui_state()
     call writefile(['alpha'], l:file_one)
-    call writefile(['beta'], l:file_two)
 
     execute 'edit ' . fnameescape(l:file_one)
-    execute 'badd ' . fnameescape(l:file_two)
 
     let l:popup_id = s:open_buffers_list_popup()
     let l:PopupFilter = s:autoload_script_local_function('PopupFilter')
-    call call(l:PopupFilter, [l:popup_id, "\<C-F>"])
-    call call(l:PopupFilter, [l:popup_id, 'b'])
-    call call(l:PopupFilter, [l:popup_id, 'E'])
+    call call(l:PopupFilter, [l:popup_id, 'x'])
 
-    let l:lines = s:get_popup_lines(l:popup_id)
-    call assert_equal(1, len(l:lines), 'Expected one filtered match for query "bE".')
-    call assert_true(
-          \ stridx(tolower(l:lines[0]), 'beta.txt') >= 0,
-          \ 'Expected query "bE" to match "Beta.txt" case-insensitively.')
+    call assert_true(index(popup_list(), l:popup_id) < 0, 'Expected x to close popup.')
   finally
     call s:close_all_popups()
     call s:wipe_file_buffers()
@@ -407,7 +398,7 @@ function! VimBuffersNaiveTestRunAll() abort
   call s:test_get_file_buffers_prefers_cwd_prefix_inside_project()
   call s:test_enrich_file_buffer_with_display_index_zero_pads_value()
   call s:test_buffers_list_shows_empty_state_when_no_file_buffers()
-  call s:test_buffers_list_filter_is_case_insensitive()
+  call s:test_buffers_list_x_closes_popup()
   call s:test_buffers_list_enter_opens_selected_buffer()
   call s:cleanup_directory(s:repo_root . '/tests/tmp')
 endfunction

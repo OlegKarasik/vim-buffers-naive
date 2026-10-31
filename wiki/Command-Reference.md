@@ -3,6 +3,7 @@
 ## `:BuffersList`
 
 Opens the popup file-buffer picker.
+The popup is list-and-select only: no interactive search/filter mode.
 
 ### Display path labels
 

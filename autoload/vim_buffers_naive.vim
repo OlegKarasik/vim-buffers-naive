@@ -5,11 +5,8 @@ let s:state = {
       \ 'source_winid': -1,
       \ 'source_bufnr': -1,
       \ 'all_buffers': [],
-      \ 'filtered_indices': [],
       \ 'selected_idx': 0,
       \ 'top_idx': 0,
-      \ 'search_mode': 0,
-      \ 'query': '',
       \ 'popup_width': 100,
       \ }
 
@@ -23,20 +20,9 @@ function! s:ResetState() abort
   let s:state.source_winid = -1
   let s:state.source_bufnr = -1
   let s:state.all_buffers = []
-  let s:state.filtered_indices = []
   let s:state.selected_idx = 0
   let s:state.top_idx = 0
-  let s:state.search_mode = 0
-  let s:state.query = ''
   let s:state.popup_width = s:max_popup_width
-endfunction
-
-function! s:TrimLastChar(text) abort
-  let l:length = strchars(a:text)
-  if l:length <= 0
-    return ''
-  endif
-  return strcharpart(a:text, 0, l:length - 1)
 endfunction
 
 function! s:Truncate(text, max_width) abort
@@ -81,20 +67,15 @@ function! s:UpdatePopupWidth() abort
   let l:max_number_width = 0
   let l:max_name_width   = 0
 
-  if empty(s:state.filtered_indices)
+  if empty(s:state.all_buffers)
     let l:max_number_width = 1
-
-    if empty(s:state.all_buffers)
-      let l:max_name_width = strdisplaywidth('0.   No files')
-    else
-      let l:max_name_width = strdisplaywidth('1.   No files match')
-    endif
+    let l:max_name_width = strdisplaywidth('0   No file buffers')
   else
-    let l:max_number_width = strdisplaywidth(string(len(s:state.filtered_indices)))
+    let l:max_number_width = strdisplaywidth(string(len(s:state.all_buffers)))
     let l:max_name_width   = 0
 
-    for l:buffer_index in s:state.filtered_indices
-      let l:name_width = strdisplaywidth(s:state.all_buffers[l:buffer_index].display_path)
+    for l:item in s:state.all_buffers
+      let l:name_width = strdisplaywidth(l:item.display_path)
       if l:name_width > l:max_name_width
         let l:max_name_width = l:name_width
       endif
@@ -106,94 +87,36 @@ function! s:UpdatePopupWidth() abort
 endfunction
 
 function! s:GetPopupTitle() abort
-  let l:title = 'Buffers List'
-  if !empty(s:state.query)
-    let l:title .= ' [' . s:state.query . ']'
-  endif
-  if s:state.search_mode
-    let l:title .= ' (SEARCH)'
-  endif
-  return l:title
+  return 'Buffers List'
 endfunction
 
 function! s:GetSelectedBufnr() abort
-  if empty(s:state.filtered_indices)
+  if empty(s:state.all_buffers)
     return -1
   endif
 
-  let l:buffer_index = s:state.filtered_indices[s:state.selected_idx]
-  return s:state.all_buffers[l:buffer_index].bufnr
+  return s:state.all_buffers[s:state.selected_idx].bufnr
 endfunction
 
-function! s:FindFileBuffersIndexes(query, buffers) abort
-  let l:query = tolower(a:query)
-  let l:filtered_indices = []
-
-  for l:index in range(len(a:buffers))
-    let l:item = a:buffers[l:index]
-    if empty(l:query) || stridx(tolower(l:item.display_path), l:query) >= 0
-      call add(l:filtered_indices, l:index)
-    endif
-  endfor
-
-  return l:filtered_indices
-endfunction
-
-function! s:ApplyFilter() abort
-  let l:selected_bufnr = s:GetSelectedBufnr()
-  let s:state.filtered_indices = s:FindFileBuffersIndexes(s:state.query, s:state.all_buffers)
-
-  if empty(s:state.filtered_indices)
-    let s:state.selected_idx = 0
-    let s:state.top_idx = 0
-    return
-  endif
-
-  let l:found_index = -1
-  if l:selected_bufnr > 0
-    for l:index in range(len(s:state.filtered_indices))
-      let l:buffer_index = s:state.filtered_indices[l:index]
-      if s:state.all_buffers[l:buffer_index].bufnr ==# l:selected_bufnr
-        let l:found_index = l:index
-        break
-      endif
-    endfor
-  endif
-
-  if l:found_index >= 0
-    let s:state.selected_idx = l:found_index
-  else
-    let s:state.selected_idx = min([s:state.selected_idx, len(s:state.filtered_indices) - 1])
-  endif
-
-  if s:state.selected_idx < 0
-    let s:state.selected_idx = 0
-  endif
-
-endfunction
-
-function! s:GetVisibleLinesCount(filtered_indices, all_buffers, max_visible_items) abort
-  if empty(a:filtered_indices) && empty(a:all_buffers)
-    return 1
-  endif
-  if empty(a:filtered_indices)
+function! s:GetVisibleLinesCount(all_buffers, max_visible_items) abort
+  if empty(a:all_buffers)
     return 1
   endif
 
-  return min([a:max_visible_items, len(a:filtered_indices)])
+  return min([a:max_visible_items, len(a:all_buffers)])
 endfunction
 
 function! s:CalculatePopupHeight(visible_lines_count) abort
   return max([1, a:visible_lines_count])
 endfunction
 
-function! s:RecalculateTopIndex(top_idx, selected_idx, filtered_indices, popup_height) abort
-  if empty(a:filtered_indices)
+function! s:RecalculateTopIndex(top_idx, selected_idx, all_buffers, popup_height) abort
+  if empty(a:all_buffers)
     return 0
   endif
 
   let l:top_idx = a:top_idx
-  let l:total = len(a:filtered_indices)
+  let l:total = len(a:all_buffers)
   let l:max_top = l:total - a:popup_height
 
   if l:top_idx > l:max_top
@@ -212,20 +135,16 @@ function! s:RecalculateTopIndex(top_idx, selected_idx, filtered_indices, popup_h
   return l:top_idx
 endfunction
 
-function! s:BuildVisibleLines(filtered_indices, all_buffers, top_idx, popup_height, popup_width) abort
-  if empty(a:filtered_indices)
-    if empty(a:all_buffers)
-      return [s:PadToWidth('0   No file buffers', a:popup_width)]
-    endif
-    return [s:PadToWidth('1.   no matches', a:popup_width)]
+function! s:BuildVisibleLines(all_buffers, top_idx, popup_height, popup_width) abort
+  if empty(a:all_buffers)
+    return [s:PadToWidth('0   No file buffers', a:popup_width)]
   endif
 
   let l:lines = []
-  let l:last_visible = min([len(a:filtered_indices) - 1, a:top_idx + a:popup_height - 1])
+  let l:last_visible = min([len(a:all_buffers) - 1, a:top_idx + a:popup_height - 1])
 
   for l:index in range(a:top_idx, l:last_visible)
-    let l:buffer_index = a:filtered_indices[l:index]
-    let l:item = a:all_buffers[l:buffer_index]
+    let l:item = a:all_buffers[l:index]
     let l:prefix = printf('%s %s ', l:item.display_index, l:item.is_active ? '*' : ' ')
     let l:max_name_width = a:popup_width - strdisplaywidth(l:prefix)
     let l:line = l:prefix . s:Truncate(l:item.display_path, l:max_name_width)
@@ -237,7 +156,6 @@ endfunction
 
 function! s:GetVisibleLines() abort
   let l:visible_lines_count = s:GetVisibleLinesCount(
-        \ s:state.filtered_indices,
         \ s:state.all_buffers,
         \ s:max_visible_items)
   let l:popup_height = s:CalculatePopupHeight(l:visible_lines_count)
@@ -245,11 +163,10 @@ function! s:GetVisibleLines() abort
   let s:state.top_idx = s:RecalculateTopIndex(
         \ s:state.top_idx,
         \ s:state.selected_idx,
-        \ s:state.filtered_indices,
+        \ s:state.all_buffers,
         \ l:popup_height)
 
   return s:BuildVisibleLines(
-        \ s:state.filtered_indices,
         \ s:state.all_buffers,
         \ s:state.top_idx,
         \ l:popup_height,
@@ -265,7 +182,7 @@ function! s:RenderPopup() abort
   let l:height = len(l:lines)
   let l:cursorline = 1
 
-  if !empty(s:state.filtered_indices)
+  if !empty(s:state.all_buffers)
     let l:cursorline = (s:state.selected_idx - s:state.top_idx) + 1
   endif
 
@@ -281,12 +198,12 @@ function! s:RenderPopup() abort
 endfunction
 
 function! s:MoveSelection(delta, ...) abort
-  if empty(s:state.filtered_indices)
+  if empty(s:state.all_buffers)
     return
   endif
 
   let l:cyclic = a:0 > 0 ? a:1 : 0
-  let l:last_index = len(s:state.filtered_indices) - 1
+  let l:last_index = len(s:state.all_buffers) - 1
   let l:new_index = s:state.selected_idx + a:delta
 
   if l:cyclic
@@ -314,7 +231,7 @@ function! s:OpenSelectedBuffer() abort
   let l:buffer_number = s:GetSelectedBufnr()
   if l:buffer_number <= 0
     echohl WarningMsg
-    echomsg 'No buffer matches the current filter'
+    echomsg 'No file buffers available'
     echohl None
     return
   endif
@@ -337,13 +254,7 @@ function! s:OnPopupClosed(id, result) abort
 endfunction
 
 function! s:PopupFilter(popup_id, key) abort
-  if a:key ==# "\<C-F>"
-    let s:state.search_mode = !s:state.search_mode
-    call s:RenderPopup()
-    return 1
-  endif
-
-  if a:key ==# "\<Esc>" || (!s:state.search_mode && a:key ==# 'x')
+  if a:key ==# "\<Esc>" || a:key ==# 'x'
     call popup_close(a:popup_id)
     return 1
   endif
@@ -373,32 +284,6 @@ function! s:PopupFilter(popup_id, key) abort
     return 1
   endif
 
-  if s:state.search_mode
-    if a:key ==# "\<C-U>"
-      let s:state.query = ''
-      call s:ApplyFilter()
-      call s:UpdatePopupWidth()
-      call s:RenderPopup()
-      return 1
-    endif
-
-    if a:key ==# "\<BS>" || a:key ==# "\<C-H>" || a:key ==# "\<Del>" || a:key ==# "\<kDel>"
-      let s:state.query = s:TrimLastChar(s:state.query)
-      call s:ApplyFilter()
-      call s:UpdatePopupWidth()
-      call s:RenderPopup()
-      return 1
-    endif
-
-    if strlen(a:key) ==# 1 && char2nr(a:key) >= 32
-      let s:state.query .= a:key
-      call s:ApplyFilter()
-      call s:UpdatePopupWidth()
-      call s:RenderPopup()
-      return 1
-    endif
-  endif
-
   return 1
 endfunction
 
@@ -417,14 +302,10 @@ function! s:OpenBuffersList() abort
   let s:state.source_bufnr = bufnr('%')
   let s:state.all_buffers = vim_buffers_naive#buffers#GetFileBuffers(s:previous_buffers, s:state.source_winid)
   let s:previous_buffers = copy(s:state.all_buffers)
-  let s:state.filtered_indices = []
   let s:state.selected_idx = 0
   let s:state.top_idx = 0
-  let s:state.search_mode = 0
-  let s:state.query = ''
   let s:state.popup_width = s:max_popup_width
 
-  call s:ApplyFilter()
   let l:lines = s:GetVisibleLines()
   let l:height = len(l:lines)
 

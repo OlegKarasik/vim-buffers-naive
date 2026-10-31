@@ -29,14 +29,10 @@ A buffer is shown only when all conditions are true:
 
 1. Buffer coresponds to the physical file
 
-# Filter and Selection
+# Selection
 
-1. Filter is case-insensitive substring match on `file_name`.
-2. Filter is reapplied after each typed character in search mode.
-3. Previous selection is preserved when possible after refilter.
-4. Empty states:
+1. Empty state:
    1. no buffers: `0   No file buffers`
-   2. no matches: `1.   no matches`
 
 # Source Window Restore
 
@@ -51,7 +47,7 @@ in current window.
 1. Public command: `:BuffersList`.
 2. Requires popup support (`popup_create`); if unavailable, command errors and stops.
 3. Closes existing plugin popup instance before opening a new one.
-4. Opens centered popup with file buffers and interactive filter/navigation.
+4. Opens centered popup with file buffers and navigation.
 5. On confirm opens selected buffer.
 6. On close resets all popup state.
 
@@ -60,7 +56,7 @@ in current window.
 ## Buffer Selection Popup Created by `:BuffersList`
 
 1. Visual style:
-   1. title: `Buffers List` (or `Buffers List [<query>] (SEARCH)` in search mode)
+   1. title: `Buffers List`
    2. width: dynamic `10..100`
    3. height: dynamic `1..10` with scrolling
    4. highlight: `Pmenu`
@@ -76,18 +72,8 @@ in current window.
 3. Action keys:
    1. `Enter` - open selected buffer
    2. `Esc` - close popup
-   3. `x` - close popup when search mode is off
-4. Search mode:
-   1. `Ctrl+F` toggles search mode
-   2. while active, printable characters append to query
-   3. query updates filtering immediately after each character
-   4. `Backspace`, `Ctrl+H`, `Del`, `kDel` remove one character
-   5. `Ctrl+U` clears query
-   6. leaving search mode keeps current query/filter active
-5. Key precedence:
-   1. `Esc`, `Enter` keep action behavior even in search mode.
-   2. all other printable characters (including `x`) are treated as search input in search mode.
-6. Rows are rendered as `<number> <marker> <file-name>`, where marker is `*` is
+   3. `x` - close popup
+4. Rows are rendered as `<number> <marker> <file-name>`, where marker is `*` is
    set for the currently active buffer. The `<file-name>` is full path to the
    file.
    1. If a `.git` directory is found while scanning parent directories up from
