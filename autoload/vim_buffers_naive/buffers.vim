@@ -49,8 +49,7 @@ function! s:FindFileBuffers() abort
 endfunction
 
 function! s:EnrichFileBufferWithDisplayPath(item) abort
-  let l:enriched_item = copy(a:item)
-  let l:absolute_path = l:enriched_item.file_path
+  let l:absolute_path = a:item.file_path
   let l:display_path  = l:absolute_path
 
   let l:home_path = substitute(fnamemodify(expand('~'), ':p'), '[\/]\+$', '', '')
@@ -68,27 +67,24 @@ function! s:EnrichFileBufferWithDisplayPath(item) abort
     endif
   endif
 
-  let l:enriched_item.display_path = l:display_path
-  return l:enriched_item
+  let a:item.display_path = l:display_path
+  return a:item
 endfunction
 
 function! s:EnrichFileBufferWithDisplayIndex(item, item_index, total_items) abort
-  let l:enriched_item = copy(a:item)
-
   let l:display_index_len = len(string(a:total_items))
   let l:display_index_fmt = '%0' . string(l:display_index_len) . 'd'
   let l:display_index     = printf(l:display_index_fmt, a:item_index)
 
-  let l:enriched_item.display_index = l:display_index
-  return l:enriched_item
+  let a:item.display_index = l:display_index
+  return a:item
 endfunction
 
 function! s:EnrichFileBufferWithActiveFlag(item, source_winid) abort
-  let l:enriched_item = copy(a:item)
   let l:active_bufnr = winbufnr(a:source_winid)
 
-  let l:enriched_item.is_active = l:enriched_item.bufnr ==# l:active_bufnr ? v:true : v:false
-  return l:enriched_item
+  let a:item.is_active = a:item.bufnr ==# l:active_bufnr ? v:true : v:false
+  return a:item
 endfunction
 
 function! vim_buffers_naive#buffers#GetFileBuffers(previous_buffers, source_winid) abort
