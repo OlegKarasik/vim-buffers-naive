@@ -387,6 +387,74 @@ function! s:test_buffers_list_enter_opens_selected_buffer() abort
   endtry
 endfunction
 
+function! s:open_many_buffers(fixture_dir, count) abort
+  for l:i in range(1, a:count)
+    let l:file = printf('%s/file%02d.txt', a:fixture_dir, l:i)
+    call writefile(['x'], l:file)
+    execute 'edit ' . fnameescape(l:file)
+  endfor
+endfunction
+
+function! s:test_buffers_list_navigation_wraps_and_scrolls() abort
+  let l:fixture_dir = s:create_fixture_directory('navigation')
+
+  try
+    call s:reset_ui_state()
+    call s:open_many_buffers(l:fixture_dir, 13)
+
+    let l:popup_id = s:open_buffers_list_popup()
+    let l:PopupFilter = s:autoload_script_local_function('PopupFilter')
+
+    let l:lines = s:get_popup_lines(l:popup_id)
+    call assert_equal(10, len(l:lines), 'Expected at most 10 visible rows.')
+    call assert_match('^01 \* .*file13\.txt$', l:lines[0])
+    call assert_equal(1, line('.', l:popup_id))
+
+    call call(l:PopupFilter, [l:popup_id, 'k'])
+    let l:lines = s:get_popup_lines(l:popup_id)
+    call assert_match('^13   .*file01\.txt$', l:lines[-1], 'Expected k on first row to wrap to last row.')
+    call assert_equal(10, line('.', l:popup_id))
+
+    call call(l:PopupFilter, [l:popup_id, "\<Down>"])
+    let l:lines = s:get_popup_lines(l:popup_id)
+    call assert_match('^01 \* ', l:lines[0], 'Expected Down on last row to wrap to first row.')
+    call assert_equal(1, line('.', l:popup_id))
+
+    call call(l:PopupFilter, [l:popup_id, "\<PageDown>"])
+    let l:lines = s:get_popup_lines(l:popup_id)
+    call assert_match('^01 \* ', l:lines[0], 'Expected PageDown to be ignored.')
+    call assert_equal(1, line('.', l:popup_id))
+  finally
+    call s:close_all_popups()
+    call s:wipe_file_buffers()
+    call s:cleanup_directory(l:fixture_dir)
+  endtry
+endfunction
+
+function! s:test_buffers_list_esc_closes_popup_and_enter_opens_scrolled_selection() abort
+  let l:fixture_dir = s:create_fixture_directory('esc-and-enter')
+
+  try
+    call s:reset_ui_state()
+    call s:open_many_buffers(l:fixture_dir, 13)
+
+    let l:popup_id = s:open_buffers_list_popup()
+    let l:PopupFilter = s:autoload_script_local_function('PopupFilter')
+    call call(l:PopupFilter, [l:popup_id, "\<Esc>"])
+    call assert_true(index(popup_list(), l:popup_id) < 0, 'Expected Esc to close popup.')
+
+    let l:popup_id = s:open_buffers_list_popup()
+    call call(l:PopupFilter, [l:popup_id, 'k'])
+    call call(l:PopupFilter, [l:popup_id, "\<CR>"])
+    call assert_equal('file01.txt', expand('%:t'), 'Expected Enter to open the buffer selected after scrolling.')
+    call assert_equal([], popup_list(), 'Expected popup to close after Enter.')
+  finally
+    call s:close_all_popups()
+    call s:wipe_file_buffers()
+    call s:cleanup_directory(l:fixture_dir)
+  endtry
+endfunction
+
 function! VimBuffersNaiveTestRunAll() abort
   call s:test_buffers_list_command_is_defined()
   call s:test_buffers_list_plug_mapping_is_defined()
@@ -400,5 +468,7 @@ function! VimBuffersNaiveTestRunAll() abort
   call s:test_buffers_list_shows_empty_state_when_no_file_buffers()
   call s:test_buffers_list_x_closes_popup()
   call s:test_buffers_list_enter_opens_selected_buffer()
+  call s:test_buffers_list_navigation_wraps_and_scrolls()
+  call s:test_buffers_list_esc_closes_popup_and_enter_opens_scrolled_selection()
   call s:cleanup_directory(s:repo_root . '/tests/tmp')
 endfunction
