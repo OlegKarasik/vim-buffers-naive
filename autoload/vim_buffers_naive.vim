@@ -144,13 +144,38 @@ function! s:OpenSelectedBuffer() abort
   execute 'buffer ' . l:bufnr
 endfunction
 
+function! s:CloseSelectedBuffer() abort
+  if empty(s:state.all_buffers)
+    return
+  endif
+
+  let l:bufnr = s:state.all_buffers[s:state.selected_idx].bufnr
+  try
+    execute 'bdelete ' . l:bufnr
+  catch
+    echohl WarningMsg
+    echomsg substitute(v:exception, '^Vim\%((\a\+)\)\=:', '', '')
+    echohl None
+    return
+  endtry
+
+  let l:selected_idx = s:state.selected_idx
+  let s:state.all_buffers = vim_buffers_naive#buffers#GetFileBuffers(s:previous_buffers, s:state.source_winid)
+  let s:previous_buffers = copy(s:state.all_buffers)
+  let s:state.selected_idx = max([0, min([l:selected_idx, len(s:state.all_buffers) - 1])])
+  let s:state.popup_width = s:CalculateWidth()
+  call s:RenderPopup()
+endfunction
+
 function! s:OnPopupClosed(id, result) abort
   let s:state = s:NewState()
 endfunction
 
 function! s:PopupFilter(popup_id, key) abort
-  if a:key ==# "\<Esc>" || a:key ==# 'x'
+  if a:key ==# "\<Esc>"
     call popup_close(a:popup_id)
+  elseif a:key ==# 'x'
+    call s:CloseSelectedBuffer()
   elseif a:key ==# "\<CR>"
     call s:OpenSelectedBuffer()
   elseif has_key(s:key_moves, a:key)

@@ -72,7 +72,9 @@ in current window.
 3. Action keys:
    1. `Enter` - open selected buffer
    2. `Esc` - close popup
-   3. `x` - close popup
+   3. `x` - close (`:bdelete`) the highlighted buffer and refresh the list;
+      popup stays open. If the buffer cannot be closed (for example, it has
+      unsaved changes), a warning is shown and the list is unchanged.
 4. Rows are rendered as `<number> <marker> <file-name>`, where marker is `*` is
    set for the currently active buffer. The `<file-name>` is full path to the
    file.

@@ -335,21 +335,26 @@ function! s:test_buffers_list_shows_empty_state_when_no_file_buffers() abort
   endtry
 endfunction
 
-function! s:test_buffers_list_x_closes_popup() abort
-  let l:fixture_dir = s:create_fixture_directory('close-popup-with-x')
+function! s:test_buffers_list_x_closes_highlighted_buffer() abort
+  let l:fixture_dir = s:create_fixture_directory('close-buffer-with-x')
   let l:file_one = l:fixture_dir . '/alpha.txt'
+  let l:file_two = l:fixture_dir . '/beta.txt'
 
   try
     call s:reset_ui_state()
     call writefile(['alpha'], l:file_one)
+    call writefile(['beta'], l:file_two)
 
     execute 'edit ' . fnameescape(l:file_one)
+    execute 'badd ' . fnameescape(l:file_two)
 
     let l:popup_id = s:open_buffers_list_popup()
     let l:PopupFilter = s:autoload_script_local_function('PopupFilter')
+    call call(l:PopupFilter, [l:popup_id, 'j'])
     call call(l:PopupFilter, [l:popup_id, 'x'])
 
-    call assert_true(index(popup_list(), l:popup_id) < 0, 'Expected x to close popup.')
+    call assert_equal(-1, bufnr(l:file_two) > 0 ? (buflisted(bufnr(l:file_two)) ? 1 : -1) : -1, 'Expected highlighted buffer to be closed.')
+    call assert_equal(1, len(getbufline(winbufnr(l:popup_id), 1, '$')), 'Expected one remaining row.')
   finally
     call s:close_all_popups()
     call s:wipe_file_buffers()
@@ -466,7 +471,7 @@ function! VimBuffersNaiveTestRunAll() abort
   call s:test_get_file_buffers_prefers_cwd_prefix_inside_project()
   call s:test_enrich_file_buffer_with_display_index_zero_pads_value()
   call s:test_buffers_list_shows_empty_state_when_no_file_buffers()
-  call s:test_buffers_list_x_closes_popup()
+  call s:test_buffers_list_x_closes_highlighted_buffer()
   call s:test_buffers_list_enter_opens_selected_buffer()
   call s:test_buffers_list_navigation_wraps_and_scrolls()
   call s:test_buffers_list_esc_closes_popup_and_enter_opens_scrolled_selection()
