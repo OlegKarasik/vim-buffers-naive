@@ -100,7 +100,3 @@ in current window.
 ## `vim_buffers_naive#BuffersList()`
 
 Opens the buffer selection popup (same behavior as `:BuffersList`).
-
-## `vim_buffers_naive#open()`
-
-Alias that calls `vim_buffers_naive#BuffersList()`.

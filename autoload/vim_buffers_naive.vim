@@ -161,9 +161,8 @@ function! s:CloseSelectedBuffer() abort
 
   let l:selected_idx = s:state.selected_idx
   let s:state.all_buffers = vim_buffers_naive#buffers#GetFileBuffers(s:previous_buffers, s:state.source_winid)
-  let s:previous_buffers = copy(s:state.all_buffers)
+  let s:previous_buffers = s:state.all_buffers
   let s:state.selected_idx = max([0, min([l:selected_idx, len(s:state.all_buffers) - 1])])
-  let s:state.popup_width = s:CalculateWidth()
   call s:RenderPopup()
 endfunction
 
@@ -198,7 +197,7 @@ function! s:OpenBuffersList() abort
   let s:state = s:NewState()
   let s:state.source_winid = win_getid()
   let s:state.all_buffers = vim_buffers_naive#buffers#GetFileBuffers(s:previous_buffers, s:state.source_winid)
-  let s:previous_buffers = copy(s:state.all_buffers)
+  let s:previous_buffers = s:state.all_buffers
   let s:state.popup_width = s:CalculateWidth()
 
   let l:height = s:CalculateHeight()
@@ -222,10 +221,6 @@ endfunction
 
 function! vim_buffers_naive#BuffersList() abort
   call s:OpenBuffersList()
-endfunction
-
-function! vim_buffers_naive#open() abort
-  call vim_buffers_naive#BuffersList()
 endfunction
 
 function! vim_buffers_naive#register_plug_mappings() abort
