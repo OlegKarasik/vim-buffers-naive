@@ -75,6 +75,10 @@ in current window.
    3. `x` - close (`:bdelete`) the highlighted buffer and refresh the list;
       popup stays open. If the buffer cannot be closed (for example, it has
       unsaved changes), a warning is shown and the list is unchanged.
+   4. `X` - close (`:bdelete`) all buffers except the active one (marked
+      `*`); popup stays open. Buffers
+      with unsaved changes are silently skipped; if any other buffer cannot
+      be closed, a warning is shown.
 4. Rows are rendered as `<number> <marker> <file-name>`, where marker is `*` is
    set for the currently active buffer. The `<file-name>` is full path to the
    file.

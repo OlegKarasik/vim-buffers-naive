@@ -362,6 +362,42 @@ function! s:test_buffers_list_x_closes_highlighted_buffer() abort
   endtry
 endfunction
 
+function! s:test_buffers_list_capital_x_keeps_only_active_buffer() abort
+  let l:fixture_dir = s:create_fixture_directory('close-others-with-x')
+  let l:file_one = l:fixture_dir . '/alpha.txt'
+  let l:file_two = l:fixture_dir . '/beta.txt'
+  let l:file_three = l:fixture_dir . '/gamma.txt'
+
+  try
+    call s:reset_ui_state()
+    call writefile(['alpha'], l:file_one)
+    call writefile(['beta'], l:file_two)
+    call writefile(['gamma'], l:file_three)
+
+    execute 'edit ' . fnameescape(l:file_one)
+    execute 'badd ' . fnameescape(l:file_two)
+    execute 'badd ' . fnameescape(l:file_three)
+    execute 'buffer ' . bufnr(l:file_three)
+    call setline(1, 'changed')
+    execute 'buffer ' . bufnr(l:file_one)
+
+    let l:popup_id = s:open_buffers_list_popup()
+    let l:PopupFilter = s:autoload_script_local_function('PopupFilter')
+    call call(l:PopupFilter, [l:popup_id, 'j'])
+    call call(l:PopupFilter, [l:popup_id, 'X'])
+
+    call assert_equal(2, len(getbufline(winbufnr(l:popup_id), 1, '$')), 'Expected active and modified rows to remain.')
+    call assert_equal(1, buflisted(bufnr(l:file_one)), 'Expected active buffer to stay.')
+    call assert_equal(0, buflisted(bufnr(l:file_two)), 'Expected other buffer to be closed.')
+    call assert_equal(1, buflisted(bufnr(l:file_three)), 'Expected modified buffer to be skipped.')
+    call assert_equal(s:normalize_path(l:file_one), s:normalize_path(expand('%:p')), 'Expected active buffer to stay shown.')
+  finally
+    call s:close_all_popups()
+    call s:wipe_file_buffers()
+    call s:cleanup_directory(l:fixture_dir)
+  endtry
+endfunction
+
 function! s:test_buffers_list_enter_opens_selected_buffer() abort
   let l:fixture_dir = s:create_fixture_directory('open-selected-buffer')
   let l:file_one = l:fixture_dir . '/first.txt'
@@ -472,6 +508,7 @@ function! VimBuffersNaiveTestRunAll() abort
   call s:test_enrich_file_buffer_with_display_index_zero_pads_value()
   call s:test_buffers_list_shows_empty_state_when_no_file_buffers()
   call s:test_buffers_list_x_closes_highlighted_buffer()
+  call s:test_buffers_list_capital_x_keeps_only_active_buffer()
   call s:test_buffers_list_enter_opens_selected_buffer()
   call s:test_buffers_list_navigation_wraps_and_scrolls()
   call s:test_buffers_list_esc_closes_popup_and_enter_opens_scrolled_selection()

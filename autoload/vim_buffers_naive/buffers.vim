@@ -87,6 +87,11 @@ function! s:EnrichFileBufferWithActiveFlag(item, source_winid) abort
   return a:item
 endfunction
 
+function! s:EnrichFileBufferWithModifiedFlag(item) abort
+  let a:item.is_modified = getbufvar(a:item.bufnr, '&modified') == 1 ? v:true : v:false
+  return a:item
+endfunction
+
 function! vim_buffers_naive#buffers#GetFileBuffers(previous_buffers, source_winid) abort
   let l:buffers = s:FindFileBuffers()
 
@@ -101,6 +106,7 @@ function! vim_buffers_naive#buffers#GetFileBuffers(previous_buffers, source_wini
   endfor
   for i in range(0, len(l:buffers) - 1)
     let l:buffers[i] = s:EnrichFileBufferWithActiveFlag(l:buffers[i], a:source_winid)
+    let l:buffers[i] = s:EnrichFileBufferWithModifiedFlag(l:buffers[i])
     if  l:buffers[i].is_active is v:true
       let l:active = l:buffers[i]
     endif

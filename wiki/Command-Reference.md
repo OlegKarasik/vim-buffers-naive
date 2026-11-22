@@ -19,4 +19,5 @@ Rows show the buffer file path with prefix rewriting in this order:
 - `j` / `Down`, `k` / `Up` - move selection (cyclic).
 - `Enter` - open the selected buffer.
 - `x` - close (`:bdelete`) the highlighted buffer and refresh the list; the popup stays open. Buffers with unsaved changes are not closed and a warning is shown.
+- `X` - close (`:bdelete`) all buffers except the active one (marked `*`); the popup stays open. Buffers with unsaved changes are skipped silently; if any other buffer cannot be closed, a warning is shown.
 - `Esc` - close the popup.

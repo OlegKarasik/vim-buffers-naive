@@ -167,6 +167,32 @@ function! s:CloseSelectedBuffer() abort
   call s:RenderPopup()
 endfunction
 
+function! s:CloseOtherBuffers() abort
+  let l:failed = 0
+  for l:buf in s:state.all_buffers
+    if l:buf.is_active || l:buf.is_modified
+      continue
+    endif
+    try
+      execute 'bdelete ' . l:buf.bufnr
+    catch
+      let l:failed += 1
+    endtry
+  endfor
+
+  if l:failed > 0
+    echohl WarningMsg
+    echomsg printf('%d buffer(s) could not be closed', l:failed)
+    echohl None
+  endif
+
+  let s:state.all_buffers = vim_buffers_naive#buffers#GetFileBuffers(s:previous_buffers, s:state.source_winid)
+  let s:previous_buffers = s:state.all_buffers
+  let s:state.selected_idx = 0
+  let s:state.popup_height = s:CalculateHeight()
+  call s:RenderPopup()
+endfunction
+
 function! s:OnPopupClosed(id, result) abort
   let s:state = s:NewState()
 endfunction
@@ -176,6 +202,8 @@ function! s:PopupFilter(popup_id, key) abort
     call popup_close(a:popup_id)
   elseif a:key ==# 'x'
     call s:CloseSelectedBuffer()
+  elseif a:key ==# 'X'
+    call s:CloseOtherBuffers()
   elseif a:key ==# "\<CR>"
     call s:OpenSelectedBuffer()
   elseif has_key(s:key_moves, a:key)
