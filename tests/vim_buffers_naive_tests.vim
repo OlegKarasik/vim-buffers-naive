@@ -436,6 +436,46 @@ function! s:open_many_buffers(fixture_dir, count) abort
   endfor
 endfunction
 
+function! s:test_buffers_list_marks_modified_buffers() abort
+  let l:fixture_dir = s:create_fixture_directory('modified')
+
+  try
+    call s:reset_ui_state()
+    call s:open_many_buffers(l:fixture_dir, 2)
+    call setline(1, 'changed')
+    let l:popup_id = s:open_buffers_list_popup()
+
+    let l:lines = s:get_popup_lines(l:popup_id)
+    call assert_match('^1 +\* .*file02\.txt', l:lines[0], 'Expected modified active row to show +*.')
+    call assert_match('^2    .*file01\.txt', l:lines[1], 'Expected unmodified row to have no flags.')
+    call popup_close(l:popup_id)
+  finally
+    call s:cleanup_directory(l:fixture_dir)
+  endtry
+endfunction
+
+function! s:test_buffers_list_aligns_rows_with_multi_digit_indexes() abort
+  let l:fixture_dir = s:create_fixture_directory('alignment')
+
+  try
+    call s:reset_ui_state()
+    call s:open_many_buffers(l:fixture_dir, 12)
+    call setline(1, 'changed')
+    let l:popup_id = s:open_buffers_list_popup()
+
+    let l:lines = s:get_popup_lines(l:popup_id)
+    call assert_equal(10, len(l:lines), 'Expected at most 10 visible rows.')
+    for l:line in l:lines
+      call assert_match('^\d\d [ +][ *] \$CWD', l:line, 'Expected zero-padded index, flags column and path.')
+    endfor
+    call assert_match('^01 +\* ', l:lines[0], 'Expected modified active row to show +*.')
+    call assert_equal(1, len(uniq(map(copy(l:lines), 'stridx(v:val, "$CWD")'))), 'Expected paths to start in the same column.')
+    call popup_close(l:popup_id)
+  finally
+    call s:cleanup_directory(l:fixture_dir)
+  endtry
+endfunction
+
 function! s:test_buffers_list_navigation_wraps_and_scrolls() abort
   let l:fixture_dir = s:create_fixture_directory('navigation')
 
@@ -448,7 +488,7 @@ function! s:test_buffers_list_navigation_wraps_and_scrolls() abort
 
     let l:lines = s:get_popup_lines(l:popup_id)
     call assert_equal(10, len(l:lines), 'Expected at most 10 visible rows.')
-    call assert_match('^01 \* .*file13\.txt$', l:lines[0])
+    call assert_match('^01  \* .*file13\.txt$', l:lines[0])
     call assert_equal(1, line('.', l:popup_id))
 
     call call(l:PopupFilter, [l:popup_id, 'k'])
@@ -458,12 +498,12 @@ function! s:test_buffers_list_navigation_wraps_and_scrolls() abort
 
     call call(l:PopupFilter, [l:popup_id, "\<Down>"])
     let l:lines = s:get_popup_lines(l:popup_id)
-    call assert_match('^01 \* ', l:lines[0], 'Expected Down on last row to wrap to first row.')
+    call assert_match('^01  \* ', l:lines[0], 'Expected Down on last row to wrap to first row.')
     call assert_equal(1, line('.', l:popup_id))
 
     call call(l:PopupFilter, [l:popup_id, "\<PageDown>"])
     let l:lines = s:get_popup_lines(l:popup_id)
-    call assert_match('^01 \* ', l:lines[0], 'Expected PageDown to be ignored.')
+    call assert_match('^01  \* ', l:lines[0], 'Expected PageDown to be ignored.')
     call assert_equal(1, line('.', l:popup_id))
   finally
     call s:close_all_popups()
@@ -510,6 +550,8 @@ function! VimBuffersNaiveTestRunAll() abort
   call s:test_buffers_list_x_closes_highlighted_buffer()
   call s:test_buffers_list_capital_x_keeps_only_active_buffer()
   call s:test_buffers_list_enter_opens_selected_buffer()
+  call s:test_buffers_list_marks_modified_buffers()
+  call s:test_buffers_list_aligns_rows_with_multi_digit_indexes()
   call s:test_buffers_list_navigation_wraps_and_scrolls()
   call s:test_buffers_list_esc_closes_popup_and_enter_opens_scrolled_selection()
   call s:cleanup_directory(s:repo_root . '/tests/tmp')

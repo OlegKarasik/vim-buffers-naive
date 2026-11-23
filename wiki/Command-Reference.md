@@ -5,6 +5,10 @@
 Opens the popup file-buffer picker.
 The popup is list-and-select only: no interactive search/filter mode.
 
+### Row format
+
+Rows are rendered as `<number> <flags> <file-name>`. `<flags>` is two fixed columns: `+` (first) marks a modified buffer and `*` (second) marks the active buffer, so a modified active buffer shows `+*`. Rows wider than the popup are truncated at the end.
+
 ### Display path labels
 
 Rows show the buffer file path with prefix rewriting in this order:

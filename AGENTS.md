@@ -79,9 +79,11 @@ in current window.
       `*`); popup stays open. Buffers
       with unsaved changes are silently skipped; if any other buffer cannot
       be closed, a warning is shown.
-4. Rows are rendered as `<number> <marker> <file-name>`, where marker is `*` is
-   set for the currently active buffer. The `<file-name>` is full path to the
-   file.
+4. Rows are rendered as `<number> <flags> <file-name>`, where `<flags>` is two
+   fixed columns: `+` in the first column for a modified buffer and `*` in the
+   second for the currently active buffer (unset columns are spaces, so a
+   modified active buffer shows `+*`). Rows wider than the popup are truncated
+   at the end. The `<file-name>` is full path to the file.
    1. If a `.git` directory is found while scanning parent directories up from
       the file path, and `getcwd()` starts with that project root path, and the
       file path starts with `getcwd()`, replace the `getcwd()` prefix with
