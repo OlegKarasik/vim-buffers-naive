@@ -2,11 +2,13 @@ scriptencoding utf-8
 
 function! s:FindProjectRoot(path) abort
   let l:current_path = fnamemodify(a:path, ':p')
-  let l:directory = getftype(l:current_path) ==# 'dir' ? l:current_path : fnamemodify(l:current_path, ':h')
+  let l:directory = getftype(l:current_path) ==# 'dir' 
+      \ ? l:current_path 
+      \ : fnamemodify(l:current_path, ':h')
 
   while !empty(l:directory)
     if getftype(fnamemodify(l:directory . '/.git', ':p')) ==# 'dir'
-      return substitute(fnamemodify(l:directory, ':p'), '[\/]\+$', '', '')
+      return fnamemodify(l:directory, ':p')
     endif
 
     let l:parent = fnamemodify(l:directory, ':h')
@@ -20,7 +22,10 @@ function! s:FindProjectRoot(path) abort
 endfunction
 
 function! s:FindFileBuffers() abort
-  let l:buffers = []
+  let l:buffers  = []
+
+  let l:cwd_path  = fnamemodify(getcwd(), ':p')
+  let l:home_path = fnamemodify(expand('~'), ':p')
 
   for l:info in getbufinfo({'buflisted': 1})
     if getbufvar(l:info.bufnr, '&buftype') !=# ''
@@ -32,16 +37,22 @@ function! s:FindFileBuffers() abort
       continue
     endif
 
-    let l:absolute_path = fnamemodify(l:name, ':p')
-    let l:file_type     = getftype(l:absolute_path)
+    let l:file_path = fnamemodify(l:name, ':p')
+    let l:file_type = getftype(l:file_path)
+
     if l:file_type !=# 'file' && l:file_type !=# 'link'
       continue
     endif
 
+    let l:project_path = s:FindProjectRoot(l:file_path)
+
     call add(l:buffers, {
           \ 'bufnr': l:info.bufnr,
-          \ 'file_path': l:absolute_path,
-          \ 'file_name': fnamemodify(l:absolute_path, ':t'),
+          \ 'cwd_path': l:cwd_path,
+          \ 'home_path': l:home_path,
+          \ 'project_path': l:project_path,
+          \ 'file_path': l:file_path,
+          \ 'file_name': fnamemodify(l:file_path, ':t'),
           \ })
   endfor
 
@@ -49,25 +60,34 @@ function! s:FindFileBuffers() abort
 endfunction
 
 function! s:EnrichFileBufferWithDisplayPath(item) abort
-  let l:absolute_path = a:item.file_path
-  let l:display_path  = l:absolute_path
+  let l:cwd_path     = a:item.cwd_path
+  let l:home_path    = a:item.home_path
+  let l:project_path = a:item.project_path
+  let l:file_path    = a:item.file_path
+  let l:display_path = a:item.file_path
+  let l:display_pcut = ''
 
-  let l:home_path = substitute(fnamemodify(expand('~'), ':p'), '[\/]\+$', '', '')
-  if !empty(l:home_path) && stridx(l:absolute_path, l:home_path) ==# 0
-    let l:display_path = '$HOME' . l:absolute_path[strlen(l:home_path):]
-  endif
+  let l:shortcuts = [
+        \ l:home_path,    "$HOME",
+        \ l:cwd_path,     "$CWD",
+        \ l:project_path, "$PROJECT"
+        \ ]
 
-  let l:project_root = s:FindProjectRoot(l:absolute_path)
-  if !empty(l:project_root) && stridx(l:absolute_path, l:project_root) ==# 0
-    let l:cwd_path = substitute(fnamemodify(getcwd(), ':p'), '[\/]\+$', '', '')
-    if stridx(l:cwd_path, l:project_root) ==# 0
-      let l:display_path = '$CWD' . l:absolute_path[strlen(l:cwd_path):]
-    else
-      let l:display_path = '$PROJECT' . l:absolute_path[strlen(l:project_root):]
+  let l:i = 0
+  while l:i < len(l:shortcuts)
+    let path = l:shortcuts[i]
+    let pcut = l:shortcuts[i + 1]
+
+    if !empty(path) && stridx(l:file_path, path) ==# 0 && strlen(path) > strlen(l:display_pcut)
+      let l:display_path = pcut . l:file_path[strlen(path) - 1:]
+      let l:display_pcut = path
     endif
-  endif
+
+    let l:i += 2
+  endwhile
 
   let a:item.display_path = l:display_path
+  let a:item.display_pcut = l:display_pcut
   return a:item
 endfunction
 

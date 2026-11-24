@@ -29,47 +29,43 @@ endfunction
 
 let s:state = s:NewState()
 
-" Reloads buffers and rebuilds the rows (not yet padded).
+" Reloads buffers, rebuilds rows and recalculates popup size.
 function! s:LoadLines() abort
   let s:state.all_buffers = vim_buffers_naive#buffers#GetFileBuffers(s:previous_buffers, s:state.source_winid)
   let s:previous_buffers = s:state.all_buffers
+  let s:state.popup_width = 0
 
   if empty(s:state.all_buffers)
     let s:state.lines = [s:empty_text]
-    return
+    let s:state.popup_width = strdisplaywidth(s:empty_text)
+  else
+    let l:lines = []
+    for l:item in s:state.all_buffers
+      let l:line = printf('%s %s%s %s', l:item.display_index,
+            \ l:item.is_modified ? '+' : ' ',
+            \ l:item.is_active ? '*' : ' ',
+            \ l:item.display_path)
+
+      " Truncate by display width: wide characters take two columns each.
+      if strdisplaywidth(l:line) > s:max_popup_width
+        let l:keep = s:max_popup_width - 3
+        let l:line = strcharpart(l:line, 0, l:keep)
+        while strdisplaywidth(l:line) > l:keep
+          let l:line = strcharpart(l:line, 0, strchars(l:line) - 1)
+        endwhile
+        let l:line .= '...'
+      endif
+
+      let s:state.popup_width = max([s:state.popup_width, strdisplaywidth(l:line)])
+      call add(l:lines, l:line)
+    endfor
+
+    let s:state.lines = l:lines
   endif
 
-  let l:lines = []
-  for l:item in s:state.all_buffers
-    let l:line = printf('%s %s%s %s', l:item.display_index,
-          \ l:item.is_modified ? '+' : ' ',
-          \ l:item.is_active ? '*' : ' ',
-          \ l:item.display_path)
-
-    " Truncate by display width: wide characters take two columns each.
-    if strdisplaywidth(l:line) > s:max_popup_width
-      let l:keep = s:max_popup_width - 3
-      let l:line = strcharpart(l:line, 0, l:keep)
-      while strdisplaywidth(l:line) > l:keep
-        let l:line = strcharpart(l:line, 0, strchars(l:line) - 1)
-      endwhile
-      let l:line .= '...'
-    endif
-
-    call add(l:lines, l:line)
-  endfor
-
-  let s:state.lines = l:lines
-endfunction
-
-" Calculates the popup size from the cached rows and pads the rows to the width.
-function! s:FitLines() abort
-  let l:content_width = max(map(copy(s:state.lines), 'strdisplaywidth(v:val)'))
-  let l:width = min([s:max_popup_width, max([s:min_popup_width, l:content_width])])
-
-  let s:state.popup_width = l:width
+  let s:state.popup_width = min([s:max_popup_width, max([s:min_popup_width, s:state.popup_width])])
   let s:state.popup_height = max([1, min([s:max_visible_items, len(s:state.all_buffers)])])
-  let s:state.lines = map(s:state.lines, {_, v -> v . repeat(' ', max([0, l:width - strdisplaywidth(v)]))})
+  let s:state.lines = map(s:state.lines, {_, v -> v . repeat(' ', max([0, s:state.popup_width - strdisplaywidth(v)]))})
 endfunction
 
 " Scrolls the window so the selected row is visible and returns the visible rows.
@@ -153,7 +149,6 @@ function! s:CloseSelectedBuffer() abort
   endtry
 
   call s:LoadLines()
-  call s:FitLines()
   let s:state.selected_idx = max([0, min([s:state.selected_idx, len(s:state.all_buffers) - 1])])
   call s:RenderPopup()
 endfunction
@@ -178,7 +173,6 @@ function! s:CloseOtherBuffers() abort
   endif
 
   call s:LoadLines()
-  call s:FitLines()
   let s:state.selected_idx = 0
   call s:RenderPopup()
 endfunction
@@ -216,7 +210,6 @@ function! s:OpenBuffersList() abort
   let s:state = s:NewState()
   let s:state.source_winid = win_getid()
   call s:LoadLines()
-  call s:FitLines()
   let s:state.popup_id = popup_create(s:GetVisibleLines(), extend(s:SizeOptions(), {
         \ 'pos': 'center',
         \ 'padding': [0, 0, 0, 0],
