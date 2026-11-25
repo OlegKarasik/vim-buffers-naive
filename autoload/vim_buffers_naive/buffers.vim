@@ -1,5 +1,21 @@
 scriptencoding utf-8
 
+function! s:IsProjectBoundary(path) abort
+  let l:type = getftype(a:path)
+  if l:type ==# 'dir'
+    return v:true
+  endif
+  if l:type ==# 'file'
+    let l:name = fnamemodify(a:path, ':t')
+    if l:name ==# '.git'
+      let l:lines = readfile(a:path, '', 1)
+      return !empty(l:lines) && l:lines[0] =~# '^gitdir:'
+    endif
+    return v:false
+  endif
+  return v:false
+endfunction
+
 function! s:FindProjectRoot(path) abort
   let l:current_path = fnamemodify(a:path, ':p')
   let l:directory = getftype(l:current_path) ==# 'dir' 
@@ -7,7 +23,7 @@ function! s:FindProjectRoot(path) abort
       \ : fnamemodify(l:current_path, ':h')
 
   while !empty(l:directory)
-    if getftype(fnamemodify(l:directory . '/.git', ':p')) ==# 'dir'
+    if s:IsProjectBoundary(fnamemodify(l:directory . '/.git', ':p'))
       return fnamemodify(l:directory, ':p')
     endif
 

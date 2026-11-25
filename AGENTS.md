@@ -84,12 +84,13 @@ in current window.
    second for the currently active buffer (unset columns are spaces, so a
    modified active buffer shows `+*`). Rows wider than the popup are truncated
    at the end. The `<file-name>` is full path to the file.
-   1. If a `.git` directory is found while scanning parent directories up from
-      the file path, and `getcwd()` starts with that project root path, and the
+   1. If a `.git` directory, or a `.git` file with a `gitdir:` line (git
+      worktree), is found while scanning parent directories up from the file
+      path (the nearest one is the project root), and `getcwd()` starts with that project root path, and the
       file path starts with `getcwd()`, replace the `getcwd()` prefix with
       `$CWD`.
-   2. Otherwise, if a `.git` directory is found while scanning parent
-      directories up from the file path, replace the project root path with the
+   2. Otherwise, if a `.git` directory or worktree `.git` file is found while
+      scanning parent directories up from the file path, replace the project root path with the
       `$PROJECT` label.
    3. If no project root is found and the file is located into users directory,
       replace the path to the user directory with the `$HOME` label.

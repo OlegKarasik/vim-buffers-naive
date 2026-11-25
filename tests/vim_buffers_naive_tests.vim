@@ -269,6 +269,34 @@ function! s:test_get_file_buffers_rewrites_project_root_prefix() abort
   endtry
 endfunction
 
+function! s:test_get_file_buffers_rewrites_worktree_root_prefix_as_project() abort
+  let l:fixture_dir = s:create_fixture_directory('worktree-label')
+  let l:main_root = l:fixture_dir . '/main-project'
+  let l:worktree_root = l:main_root . '/.worktrees/feature'
+  let l:file_path = l:worktree_root . '/src/main.txt'
+
+  try
+    call s:reset_ui_state()
+    call mkdir(l:main_root . '/.git/worktrees/feature', 'p')
+    call mkdir(fnamemodify(l:file_path, ':h'), 'p')
+    call writefile(['gitdir: ' . l:main_root . '/.git/worktrees/feature'], l:worktree_root . '/.git')
+    call writefile(['main'], l:file_path)
+    execute 'edit ' . fnameescape(l:file_path)
+
+    let l:buffers = vim_buffers_naive#buffers#GetFileBuffers([], win_getid())
+    let l:item = s:find_buffer_item_by_path(l:buffers, l:file_path)
+
+    call assert_false(empty(l:item), 'Expected GetFileBuffers to include the worktree test file.')
+    call assert_equal(
+          \ '$PROJECT/src/main.txt',
+          \ l:item.display_path,
+          \ 'Expected display_path to replace the worktree root with $PROJECT label.')
+  finally
+    call s:reset_ui_state()
+    call s:cleanup_directory(l:fixture_dir)
+  endtry
+endfunction
+
 function! s:test_get_file_buffers_prefers_cwd_prefix_inside_project() abort
   let l:fixture_dir = s:create_fixture_directory('cwd-label-inside-project')
   let l:project_root = l:fixture_dir . '/sample-project'
@@ -544,6 +572,7 @@ function! VimBuffersNaiveTestRunAll() abort
   call s:test_get_file_buffers_reverses_without_previous_and_keeps_active_first()
   call s:test_get_file_buffers_merges_previous_and_prepends_new_reversed()
   call s:test_get_file_buffers_rewrites_project_root_prefix()
+  call s:test_get_file_buffers_rewrites_worktree_root_prefix_as_project()
   call s:test_get_file_buffers_prefers_cwd_prefix_inside_project()
   call s:test_enrich_file_buffer_with_display_index_zero_pads_value()
   call s:test_buffers_list_shows_empty_state_when_no_file_buffers()
