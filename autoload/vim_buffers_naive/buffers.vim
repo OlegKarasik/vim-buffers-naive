@@ -18,15 +18,25 @@ function! s:IsProjectBoundary(path) abort
   return v:false
 endfunction
 
-function! s:FindProjectRoot(path) abort
+function! s:FindProjectRoot(path, cache) abort
   let l:current_path = fnamemodify(a:path, ':p')
   let l:directory = getftype(l:current_path) ==# 'dir' 
       \ ? l:current_path 
       \ : fnamemodify(l:current_path, ':h')
 
+  let l:visited = []
+  let l:root = ''
+
   while !empty(l:directory)
+    if has_key(a:cache, l:directory)
+      let l:root = a:cache[l:directory]
+      break
+    endif
+    call add(l:visited, l:directory)
+
     if s:IsProjectBoundary(fnamemodify(l:directory . '/.git', ':p'))
-      return fnamemodify(l:directory, ':p')
+      let l:root = fnamemodify(l:directory, ':p')
+      break
     endif
 
     let l:parent = fnamemodify(l:directory, ':h')
@@ -36,7 +46,11 @@ function! s:FindProjectRoot(path) abort
     let l:directory = l:parent
   endwhile
 
-  return ''
+  for l:dir in l:visited
+    let a:cache[l:dir] = l:root
+  endfor
+
+  return l:root
 endfunction
 
 function! s:FindFileBuffers() abort
@@ -44,6 +58,8 @@ function! s:FindFileBuffers() abort
 
   let l:cwd_path  = fnamemodify(getcwd(), ':p')
   let l:home_path = fnamemodify(expand('~'), ':p')
+
+  let l:project_cache = {}
 
   for l:info in getbufinfo({'buflisted': 1})
     if getbufvar(l:info.bufnr, '&buftype') !=# ''
@@ -62,7 +78,7 @@ function! s:FindFileBuffers() abort
       continue
     endif
 
-    let l:project_path = s:FindProjectRoot(l:file_path)
+    let l:project_path = s:FindProjectRoot(l:file_path, l:project_cache)
 
     call add(l:buffers, {
           \ 'bufnr': l:info.bufnr,
