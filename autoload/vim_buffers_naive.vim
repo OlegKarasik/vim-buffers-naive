@@ -1,54 +1,67 @@
 scriptencoding utf-8
 
-let s:title = 'Buffers List'
-let s:empty_text = '0   No file buffers'
-let s:min_popup_width = 10
-let s:max_popup_width = 100
-let s:max_visible_items = 10
-let s:previous_buffers = []
+let s:constant_tabs = ['CWD', 'PROJECT', 'HOME', 'ALL']
+let s:constant_titles = [
+      \ 'Buffers List: [CWD] PROJECT HOME ALL',
+      \ 'Buffers List: CWD [PROJECT] HOME ALL',
+      \ 'Buffers List: CWD PROJECT [HOME] ALL',
+      \ 'Buffers List: CWD PROJECT HOME [ALL]',
+      \ ]
+let s:constant_all_tab_idx = index(s:constant_tabs, 'ALL')
+let s:constant_empty_text = 'No buffers'
+let s:constant_popup_width = 150
+let s:constant_popup_width_margin = 20
+let s:constant_popup_height = 15
 
-let s:key_moves = {
+let s:constant_key_cursor = {
       \ 'j': 1,
       \ "\<Down>": 1,
       \ 'k': -1,
       \ "\<Up>": -1,
       \ }
 
-function! s:NewState() abort
-  return {
-        \ 'popup_id': -1,
-        \ 'source_winid': -1,
-        \ 'all_buffers': [],
-        \ 'lines': [],
-        \ 'selected_idx': 0,
-        \ 'top_idx': 0,
-        \ 'popup_width': s:max_popup_width,
-        \ 'popup_height': 1,
-        \ }
+let s:constant_key_tabs = {
+      \ 't': 1,
+      \ 'T': -1,
+      \ }
+
+let s:previous_buffers = []
+
+function! s:ResetState() abort
+  let s:popup_id = -1
+  let s:source_winid = -1
+  let s:tab_idx = s:constant_all_tab_idx
+  let s:all_buffers = {}
+  let s:all_lines = {}
+  let s:selected_idx = 0
+  let s:top_idx = 0
+  " Use the default width unless the screen is narrower than it.
+  let s:popup_width = &columns >= s:constant_popup_width
+        \ ? s:constant_popup_width
+        \ : max([1, &columns - s:constant_popup_width_margin])
 endfunction
 
-let s:state = s:NewState()
+" Reloads buffers and builds rows of every tab padded to the popup width.
+function! s:BuildLines() abort
+  let s:all_buffers = vim_buffers_naive#buffers#GetFileBuffers(s:previous_buffers, s:source_winid)
+  let s:all_lines = {}
 
-" Reloads buffers, rebuilds rows and recalculates popup size.
-function! s:LoadLines() abort
-  let s:state.all_buffers = vim_buffers_naive#buffers#GetFileBuffers(s:previous_buffers, s:state.source_winid)
-  let s:previous_buffers = s:state.all_buffers
-  let s:state.popup_width = 0
+  let s:previous_buffers = map(copy(s:all_buffers.ALL), {_, v -> v.item})
 
-  if empty(s:state.all_buffers)
-    let s:state.lines = [s:empty_text]
-    let s:state.popup_width = strdisplaywidth(s:empty_text)
-  else
-    let l:lines = []
-    for l:item in s:state.all_buffers
-      let l:line = printf('%s %s%s %s', l:item.display_index,
+  for l:tab in s:constant_tabs
+    let l:entries = get(s:all_buffers, l:tab, [])
+    let l:lines = empty(l:entries) ? [s:constant_empty_text] : []
+
+    for l:entry in l:entries
+      let l:item = l:entry.item
+      let l:line = printf('%s %s%s %s', l:entry.idx,
             \ l:item.is_modified ? '+' : ' ',
             \ l:item.is_active ? '*' : ' ',
-            \ l:item.display_path)
+            \ l:entry.path)
 
       " Truncate by display width: wide characters take two columns each.
-      if strdisplaywidth(l:line) > s:max_popup_width
-        let l:keep = s:max_popup_width - 3
+      if strdisplaywidth(l:line) > s:popup_width
+        let l:keep = s:popup_width - 3
         let l:line = strcharpart(l:line, 0, l:keep)
         while strdisplaywidth(l:line) > l:keep
           let l:line = strcharpart(l:line, 0, strchars(l:line) - 1)
@@ -56,76 +69,67 @@ function! s:LoadLines() abort
         let l:line .= '...'
       endif
 
-      let s:state.popup_width = max([s:state.popup_width, strdisplaywidth(l:line)])
       call add(l:lines, l:line)
     endfor
 
-    let s:state.lines = l:lines
-  endif
-
-  let s:state.popup_width = min([s:max_popup_width, max([s:min_popup_width, s:state.popup_width])])
-  let s:state.popup_height = max([1, min([s:max_visible_items, len(s:state.all_buffers)])])
-  let s:state.lines = map(s:state.lines, {_, v -> v . repeat(' ', max([0, s:state.popup_width - strdisplaywidth(v)]))})
+    let s:all_lines[l:tab] = map(l:lines,
+          \ {_, v -> v . repeat(' ', max([0, s:popup_width - strdisplaywidth(v)]))})
+  endfor
 endfunction
 
-" Scrolls the window so the selected row is visible and returns the visible rows.
-function! s:GetVisibleLines() abort
-  let l:height = s:state.popup_height
-  let l:top = min([s:state.top_idx, s:state.selected_idx])
-  let l:top = max([l:top, s:state.selected_idx - l:height + 1])
-  let s:state.top_idx = max([0, l:top])
-
-  return s:state.lines[s:state.top_idx : s:state.top_idx + l:height - 1]
+function! s:GetActiveBuffers() abort
+  return get(s:all_buffers, s:constant_tabs[s:tab_idx], [])
 endfunction
 
-function! s:SizeOptions() abort
+function! s:GetActiveLines() abort
+  return s:all_lines[s:constant_tabs[s:tab_idx]]
+endfunction
+
+function! s:GetActivePopupOptions() abort
   return {
-        \ 'title': s:title,
-        \ 'minwidth': s:state.popup_width,
-        \ 'maxwidth': s:state.popup_width,
-        \ 'minheight': s:state.popup_height,
-        \ 'maxheight': s:state.popup_height,
+        \ 'title': s:constant_titles[s:tab_idx],
+        \ 'minwidth': s:popup_width,
+        \ 'maxwidth': s:popup_width,
+        \ 'minheight': s:constant_popup_height,
+        \ 'maxheight': s:constant_popup_height,
         \ }
 endfunction
 
-function! s:RenderPopup() abort
-  if s:state.popup_id <= 0
-    return
-  endif
-
-  let l:lines = s:GetVisibleLines()
-  let l:cursorline = empty(s:state.all_buffers) ? 1 : s:state.selected_idx - s:state.top_idx + 1
-
-  call popup_settext(s:state.popup_id, l:lines)
-  call popup_setoptions(s:state.popup_id, s:SizeOptions())
-  call win_execute(s:state.popup_id, printf('call cursor(%d, 1)', l:cursorline))
+function! s:ActionMoveActiveTab(delta) abort
+  let l:count = len(s:constant_tabs)
+  let s:tab_idx = (s:tab_idx + a:delta + l:count) % l:count
+  let s:selected_idx = 0
+  let s:top_idx = 0
+  call s:RenderPopup()
 endfunction
 
-function! s:MoveSelection(delta) abort
-  let l:count = len(s:state.all_buffers)
+function! s:ActionMoveActiveSelection(delta) abort
+  let l:buffers = s:GetActiveBuffers()
+  let l:count = len(l:buffers)
   if l:count == 0
     return
   endif
 
-  let l:index = (s:state.selected_idx + a:delta + l:count) % l:count
+  let l:index = (s:selected_idx + a:delta + l:count) % l:count
 
-  if l:index !=# s:state.selected_idx
-    let s:state.selected_idx = l:index
+  if l:index !=# s:selected_idx
+    let s:selected_idx = l:index
     call s:RenderPopup()
   endif
 endfunction
 
-function! s:OpenSelectedBuffer() abort
-  if empty(s:state.all_buffers)
+function! s:ActionOpenSelectedBuffer() abort
+  let l:buffers = s:GetActiveBuffers()
+  if empty(l:buffers)
     echohl WarningMsg
     echomsg 'No file buffers available'
     echohl None
     return
   endif
 
-  let l:bufnr = s:state.all_buffers[s:state.selected_idx].bufnr
-  let l:winid = s:state.source_winid
-  call popup_close(s:state.popup_id)
+  let l:bufnr = l:buffers[s:selected_idx].item.bufnr
+  let l:winid = s:source_winid
+  call popup_close(s:popup_id)
 
   if l:winid > 0
     call win_gotoid(l:winid)
@@ -133,12 +137,13 @@ function! s:OpenSelectedBuffer() abort
   execute 'buffer ' . l:bufnr
 endfunction
 
-function! s:CloseSelectedBuffer() abort
-  if empty(s:state.all_buffers)
+function! s:ActionCloseSelectedBuffer() abort
+  let l:buffers = s:GetActiveBuffers()
+  if empty(l:buffers)
     return
   endif
 
-  let l:bufnr = s:state.all_buffers[s:state.selected_idx].bufnr
+  let l:bufnr = l:buffers[s:selected_idx].item.bufnr
   try
     execute 'bdelete ' . l:bufnr
   catch
@@ -148,14 +153,15 @@ function! s:CloseSelectedBuffer() abort
     return
   endtry
 
-  call s:LoadLines()
-  let s:state.selected_idx = max([0, min([s:state.selected_idx, len(s:state.all_buffers) - 1])])
+  call s:BuildLines()
+  let s:selected_idx = max([0, min([s:selected_idx, len(s:GetActiveBuffers()) - 1])])
   call s:RenderPopup()
 endfunction
 
-function! s:CloseOtherBuffers() abort
+function! s:ActionCloseOtherBuffers() abort
   let l:failed = 0
-  for l:buf in s:state.all_buffers
+  for l:entry in s:GetActiveBuffers()
+    let l:buf = l:entry.item
     if l:buf.is_active || l:buf.is_modified
       continue
     endif
@@ -172,64 +178,86 @@ function! s:CloseOtherBuffers() abort
     echohl None
   endif
 
-  call s:LoadLines()
-  let s:state.selected_idx = 0
+  call s:BuildLines()
+  let s:selected_idx = 0
   call s:RenderPopup()
 endfunction
 
 function! s:OnPopupClosed(id, result) abort
-  let s:state = s:NewState()
+  call s:ResetState()
 endfunction
 
-function! s:PopupFilter(popup_id, key) abort
+function! s:OnPopupKeyPress(id, key) abort
   if a:key ==# "\<Esc>"
-    call popup_close(a:popup_id)
+    call popup_close(a:id)
   elseif a:key ==# 'x'
-    call s:CloseSelectedBuffer()
+    call s:ActionCloseSelectedBuffer()
   elseif a:key ==# 'X'
-    call s:CloseOtherBuffers()
+    call s:ActionCloseOtherBuffers()
   elseif a:key ==# "\<CR>"
-    call s:OpenSelectedBuffer()
-  elseif has_key(s:key_moves, a:key)
-    call s:MoveSelection(s:key_moves[a:key])
+    call s:ActionOpenSelectedBuffer()
+  elseif has_key(s:constant_key_tabs, a:key)
+    call s:ActionMoveActiveTab(s:constant_key_tabs[a:key])
+  elseif has_key(s:constant_key_cursor, a:key)
+    call s:ActionMoveActiveSelection(s:constant_key_cursor[a:key])
   endif
 
   return 1
 endfunction
 
-function! s:OpenBuffersList() abort
+function! s:RenderPopup() abort
+  if s:popup_id <= 0
+    return
+  endif
+
+  " Scroll so the selected row is visible.
+  let l:top = min([s:top_idx, s:selected_idx])
+  let l:top = max([l:top, s:selected_idx - s:constant_popup_height + 1])
+  let s:top_idx = max([0, l:top])
+
+  let l:lines = s:GetActiveLines()[s:top_idx : s:top_idx + s:constant_popup_height - 1]
+  let l:cursorline = empty(s:GetActiveBuffers()) ? 1 : s:selected_idx - s:top_idx + 1
+
+  call popup_settext(s:popup_id, l:lines)
+  call popup_setoptions(s:popup_id, s:GetActivePopupOptions())
+  call win_execute(s:popup_id, printf('call cursor(%d, 1)', l:cursorline))
+endfunction
+
+function! s:OpenPopup() abort
   if !exists('*popup_create')
     echoerr 'vim-buffers-naive: popup support is required (missing popup_create())'
     return
   endif
 
-  if s:state.popup_id > 0
-    call popup_close(s:state.popup_id)
+  if s:popup_id > 0
+    call popup_close(s:popup_id)
   endif
 
-  let s:state = s:NewState()
-  let s:state.source_winid = win_getid()
-  call s:LoadLines()
-  let s:state.popup_id = popup_create(s:GetVisibleLines(), extend(s:SizeOptions(), {
+  call s:ResetState()
+
+  let s:source_winid = win_getid()
+  let s:popup_id = popup_create([], extend(s:GetActivePopupOptions(), {
         \ 'pos': 'center',
         \ 'padding': [0, 0, 0, 0],
         \ 'border': [1, 1, 1, 1],
         \ 'borderchars': ['─', '│', '─', '│', '┌', '┐', '┘', '└'],
         \ 'mapping': 0,
-        \ 'filter': function('s:PopupFilter'),
+        \ 'filter': function('s:OnPopupKeyPress'),
         \ 'callback': function('s:OnPopupClosed'),
         \ 'highlight': 'Pmenu',
         \ 'cursorline': 1,
         \ 'zindex': 200,
         \ }))
 
-  call win_execute(s:state.popup_id, 'setlocal winhighlight=Normal:Pmenu,CursorLine:PmenuSel')
-  call win_execute(s:state.popup_id, "call matchadd('String', '\\v\\$(PROJECT|CWD|HOME)')")
+  call win_execute(s:popup_id, 'setlocal winhighlight=Normal:Pmenu,CursorLine:PmenuSel')
+  call win_execute(s:popup_id, "call matchadd('String', '\\v\\$(PROJECT|CWD|HOME)')")
+
+  call s:BuildLines()
   call s:RenderPopup()
 endfunction
 
 function! vim_buffers_naive#BuffersList() abort
-  call s:OpenBuffersList()
+  call s:OpenPopup()
 endfunction
 
 function! vim_buffers_naive#register_plug_mappings() abort
@@ -241,3 +269,6 @@ function! s:register_plug_mapping(lhs, rhs) abort
     execute 'nnoremap <silent> ' . a:lhs . ' ' . a:rhs
   endif
 endfunction
+
+" Initial state reset, so we start clean when plugin loads 
+call s:ResetState()

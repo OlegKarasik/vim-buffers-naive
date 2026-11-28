@@ -32,7 +32,7 @@ A buffer is shown only when all conditions are true:
 # Selection
 
 1. Empty state:
-   1. no buffers: `0   No file buffers`
+   1. no buffers: `No buffers`
 
 # Source Window Restore
 
@@ -56,12 +56,17 @@ in current window.
 ## Buffer Selection Popup Created by `:BuffersList`
 
 1. Visual style:
-   1. title: `Buffers List`
-   2. width: dynamic `10..100`
-   3. height: dynamic `1..10` with scrolling
+   1. title: `Buffers List: <tabs>`, where `<tabs>` is `CWD PROJECT HOME ALL`
+      with the active tab wrapped in brackets (for example
+      `Buffers List: CWD PROJECT [HOME] ALL`); titles of all tabs are
+      predefined, so switching tabs does not rebuild them
+   2. width: `150` columns; if the screen (`&columns`) is narrower than
+      `150`, width is `&columns - 20`. Width is computed once when the popup
+      opens, so switching tabs or closing buffers does not resize it.
+   3. height: fixed `15` rows with scrolling; it is never recalculated
    4. highlight: `Pmenu`
    5. cursor line highlight: `PmenuSel`
-   6. border: single-line rounded (`╭╮╯╰`, `─`, `│`)
+   6. border: single-line square (`┌┐┘└`, `─`, `│`)
    7. centered position
    8. `$CWD`, `$PROJECT`, and `$HOME` labels are highlighted with `String`
 2. Navigation keys:
@@ -69,14 +74,16 @@ in current window.
    2. `k`, `Up` - move up
    3. navigation is cyclic: on the first row, `k`/`Up` jumps to the last row;
       on the last row, `j`/`Down` jumps to the first row
-3. Action keys:
+   4. `t` - switch to the next tab, `T` - switch to the previous tab; tab
+      switching is cyclic and resets the selection to the first row
+3. Action keys (all operate on the active tab only):
    1. `Enter` - open selected buffer
    2. `Esc` - close popup
    3. `x` - close (`:bdelete`) the highlighted buffer and refresh the list;
       popup stays open. If the buffer cannot be closed (for example, it has
       unsaved changes), a warning is shown and the list is unchanged.
-   4. `X` - close (`:bdelete`) all buffers except the active one (marked
-      `*`); popup stays open. Buffers
+   4. `X` - close (`:bdelete`) all buffers of the active tab except the
+      active one (marked `*`); popup stays open. Buffers
       with unsaved changes are silently skipped; if any other buffer cannot
       be closed, a warning is shown.
 4. Rows are rendered as `<number> <flags> <file-name>`, where `<flags>` is two
@@ -84,17 +91,29 @@ in current window.
    second for the currently active buffer (unset columns are spaces, so a
    modified active buffer shows `+*`). Rows wider than the popup are truncated
    at the end. The `<file-name>` is full path to the file.
-   1. If a `.git` directory, or a `.git` file with a `gitdir:` line (git
-      worktree), is found while scanning parent directories up from the file
-      path (the nearest one is the project root), and `getcwd()` starts with that project root path, and the
-      file path starts with `getcwd()`, replace the `getcwd()` prefix with
-      `$CWD`.
-   2. Otherwise, if a `.git` directory or worktree `.git` file is found while
-      scanning parent directories up from the file path, replace the project root path with the
-      `$PROJECT` label.
-   3. If no project root is found and the file is located into users directory,
-      replace the path to the user directory with the `$HOME` label.
-   4. otherwise, show the full path.
+   1. Candidate label roots are the user home directory (`$HOME`),
+      `getcwd()` (`$CWD`), and the project root (`$PROJECT`). The project
+      root is the nearest parent directory of the file containing a `.git`
+      directory or a `.git` file with a `gitdir:` line (git worktree).
+   2. Among the candidate roots that prefix the file path, the longest one is
+      chosen; on equal length the earlier one in the order `$HOME`, `$CWD`,
+      `$PROJECT` wins.
+   3. On the `ALL` tab a labeled path is shown as
+      `$<LABEL>/<path-relative-to-root>`.
+   4. If no candidate root matches, the path is shown on the `ALL` tab as
+      `$` followed by the full path (for example `$/etc/hosts`).
+5. Tabs:
+   1. The popup always opens on the `ALL` tab (the last one); `t` from `ALL`
+      wraps to `CWD`.
+   2. `ALL` lists every file buffer with labels as described above.
+   3. `HOME`, `CWD`, and `PROJECT` list only buffers whose label (as shown
+      on `ALL`) is `$HOME`, `$CWD`, or `$PROJECT` respectively; a buffer
+      belongs to exactly one of these tabs. Buffers without a label appear
+      only on `ALL`.
+   4. On `HOME`, `CWD`, and `PROJECT` tabs, `<file-name>` is shown relative to
+      the label root, without the `$*` prefix and leading separator.
+   5. Row numbers restart from `1` within each tab.
+   6. An empty tab shows `No buffers`.
 
 # Plug Mappings
 

@@ -9,19 +9,33 @@ The popup is list-and-select only: no interactive search/filter mode.
 
 Rows are rendered as `<number> <flags> <file-name>`. `<flags>` is two fixed columns: `+` (first) marks a modified buffer and `*` (second) marks the active buffer, so a modified active buffer shows `+*`. Rows wider than the popup are truncated at the end.
 
+### Popup size
+
+The popup is `150` columns wide; on screens narrower than `150` columns it is the screen width minus `20`. The width is computed when the popup opens. The height is always `15` rows; longer lists scroll.
+
 ### Display path labels
 
-Rows show the buffer file path with prefix rewriting in this order:
+Rows show the buffer file path with a label prefix:
 
-1. If a `.git` directory, or a `.git` file with a `gitdir:` line (git worktree), is found in parent directories (the nearest one is the project root), `getcwd()` starts with that project-root path, and the file path starts with `getcwd()`, the `getcwd()` prefix is replaced with `$CWD`.
-2. Otherwise, if a `.git` directory or worktree `.git` file is found in parent directories, the project-root prefix is replaced with `$PROJECT`.
-3. If no project root is found and the file is under the user home directory, the home prefix is replaced with `$HOME`.
-4. Otherwise the full absolute path is shown.
+1. Candidate label roots are the user home directory (`$HOME`), `getcwd()` (`$CWD`), and the project root (`$PROJECT`). The project root is the nearest parent directory containing a `.git` directory or a `.git` file with a `gitdir:` line (git worktree).
+2. Among the candidate roots that prefix the file path, the longest one is chosen; on equal length the earlier one in the order `$HOME`, `$CWD`, `$PROJECT` wins.
+3. On `ALL`, a labeled path is shown as `$<LABEL>/<path-relative-to-root>`.
+4. If no candidate root matches, the path is shown on `ALL` as `$` followed by the full path (for example `$/etc/hosts`).
+
+### Tabs
+
+The popup title shows the tabs `CWD PROJECT HOME ALL`; the active one is wrapped in brackets, for example `Buffers List: CWD PROJECT [HOME] ALL`. The popup always opens on `ALL` (the last tab); `t` from `ALL` wraps to `CWD`.
+
+- `ALL` - every file buffer, with `$HOME` / `$CWD` / `$PROJECT` labels.
+- `HOME`, `CWD`, `PROJECT` - only buffers whose label on `ALL` is `$HOME`, `$CWD`, or `$PROJECT`. Each buffer belongs to exactly one of these tabs; unlabeled buffers appear only on `ALL`. Paths are shown relative to the label root without the `$*` prefix, and row numbers restart from `1`.
+
+All action keys operate on the active tab only.
 
 ### Popup keys
 
 - `j` / `Down`, `k` / `Up` - move selection (cyclic).
+- `t` / `T` - switch to the next / previous tab (cyclic); selection resets to the first row.
 - `Enter` - open the selected buffer.
 - `x` - close (`:bdelete`) the highlighted buffer and refresh the list; the popup stays open. Buffers with unsaved changes are not closed and a warning is shown.
-- `X` - close (`:bdelete`) all buffers except the active one (marked `*`); the popup stays open. Buffers with unsaved changes are skipped silently; if any other buffer cannot be closed, a warning is shown.
+- `X` - close (`:bdelete`) all buffers of the active tab except the active one (marked `*`); the popup stays open. Buffers with unsaved changes are skipped silently; if any other buffer cannot be closed, a warning is shown.
 - `Esc` - close the popup.

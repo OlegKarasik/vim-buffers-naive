@@ -11,7 +11,7 @@
 1. dynamic height: `1..10` lines (with scrollbar)
 2. highlight: `Pmenu`
 3. border highlight: `Pmenu`
-4. single-line rounded border style
+4. single-line square border style
 5. width is repository/command specific (see repository-specific popup docs)
 
 ## Navigation keys

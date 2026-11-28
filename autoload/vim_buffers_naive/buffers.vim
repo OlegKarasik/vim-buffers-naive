@@ -1,5 +1,7 @@
 scriptencoding utf-8
 
+let s:separator = exists('+shellslash') && !&shellslash ? '\' : '/'
+
 function! s:IsProjectBoundary(path) abort
   let l:type = getftype(a:path)
   if l:type ==# 'dir'
@@ -75,44 +77,34 @@ function! s:FindFileBuffers() abort
   return l:buffers
 endfunction
 
-function! s:EnrichFileBufferWithDisplayPath(item) abort
-  let l:cwd_path     = a:item.cwd_path
-  let l:home_path    = a:item.home_path
-  let l:project_path = a:item.project_path
-  let l:file_path    = a:item.file_path
-  let l:display_path = a:item.file_path
-  let l:display_pcut = ''
+function! s:EnrichFileBufferWithRelativePath(item) abort
+  let l:file_path     = a:item.file_path
+  let l:relative_path = l:file_path
+  let l:relative_pcat = ''
+  let l:matched_root  = ''
 
   let l:shortcuts = [
-        \ l:home_path,    "$HOME",
-        \ l:cwd_path,     "$CWD",
-        \ l:project_path, "$PROJECT"
+        \ a:item.home_path,    'HOME',
+        \ a:item.cwd_path,     'CWD',
+        \ a:item.project_path, 'PROJECT'
         \ ]
 
   let l:i = 0
   while l:i < len(l:shortcuts)
-    let path = l:shortcuts[i]
-    let pcut = l:shortcuts[i + 1]
+    let l:root = l:shortcuts[l:i]
+    let l:name = l:shortcuts[l:i + 1]
 
-    if !empty(path) && stridx(l:file_path, path) ==# 0 && strlen(path) > strlen(l:display_pcut)
-      let l:display_path = pcut . l:file_path[strlen(path) - 1:]
-      let l:display_pcut = path
+    if !empty(l:root) && stridx(l:file_path, l:root) ==# 0 && strlen(l:root) > strlen(l:matched_root)
+      let l:relative_path = l:file_path[strlen(l:root):]
+      let l:relative_pcat = l:name
+      let l:matched_root = l:root
     endif
 
     let l:i += 2
   endwhile
 
-  let a:item.display_path = l:display_path
-  let a:item.display_pcut = l:display_pcut
-  return a:item
-endfunction
-
-function! s:EnrichFileBufferWithDisplayIndex(item, item_index, total_items) abort
-  let l:display_index_len = len(string(a:total_items))
-  let l:display_index_fmt = '%0' . string(l:display_index_len) . 'd'
-  let l:display_index     = printf(l:display_index_fmt, a:item_index)
-
-  let a:item.display_index = l:display_index
+  let a:item.relative_path = l:relative_path
+  let a:item.relative_pcat = l:relative_pcat
   return a:item
 endfunction
 
@@ -143,6 +135,7 @@ function! vim_buffers_naive#buffers#GetFileBuffers(previous_buffers, source_wini
   for i in range(0, len(l:buffers) - 1)
     let l:buffers[i] = s:EnrichFileBufferWithActiveFlag(l:buffers[i], a:source_winid)
     let l:buffers[i] = s:EnrichFileBufferWithModifiedFlag(l:buffers[i])
+    let l:buffers[i] = s:EnrichFileBufferWithRelativePath(l:buffers[i])
     if  l:buffers[i].is_active is v:true
       let l:active = l:buffers[i]
     endif
@@ -152,7 +145,7 @@ function! vim_buffers_naive#buffers#GetFileBuffers(previous_buffers, source_wini
   for i in range(0, len(a:previous_buffers) - 1)
     let l:val = get(l:mapping, a:previous_buffers[i].file_path, v:null)
     if l:val isnot v:null
-      if l:active is v:null || a:previous_buffers[i].file_path !=? l:active.file_path
+      if l:active is v:null || a:previous_buffers[i].file_path !=# l:active.file_path
         call add(l:output, l:val)
       endif
     endif
@@ -160,7 +153,7 @@ function! vim_buffers_naive#buffers#GetFileBuffers(previous_buffers, source_wini
   for i in range(0, len(l:buffers) - 1)
     let l:val = get(l:previous_mapping, l:buffers[i].file_path, v:null)
     if l:val is v:null
-      if l:active is v:null || l:buffers[i].file_path !=? l:active.file_path
+      if l:active is v:null || l:buffers[i].file_path !=# l:active.file_path
         call insert(l:output, l:buffers[i], 0)
       endif
     endif
@@ -169,10 +162,37 @@ function! vim_buffers_naive#buffers#GetFileBuffers(previous_buffers, source_wini
     call insert(l:output, l:active, 0)
   endif
 
+  let l:pcat_idx_fmt  = '%0' . len(string(len(l:output))) . 'd'
+  let l:pcat_path_fmt = '$%s' . s:separator . '%s'
+
+  let l:pcat_output   = { 'ALL': [] }
   for i in range(0, len(l:output) - 1)
-    let l:output[i] = s:EnrichFileBufferWithDisplayPath (l:output[i])
-    let l:output[i] = s:EnrichFileBufferWithDisplayIndex(l:output[i], i + 1, len(l:output))
+    let l:relative_pcat = l:output[i].relative_pcat
+    let l:relative_path = l:output[i].relative_path
+
+    if l:relative_pcat !=# ''
+      if !has_key(l:pcat_output, l:relative_pcat)
+        let l:pcat_output[l:relative_pcat] = []
+      endif
+      call add(
+            \ l:pcat_output[l:relative_pcat],
+            \ #{
+            \     idx: printf(l:pcat_idx_fmt, len(l:pcat_output[l:relative_pcat]) + 1),
+            \     path: l:relative_path,
+            \     item: l:output[i]
+            \  })
+    else
+      let l:relative_path = l:relative_path[1:]
+    endif
+
+    call add(
+          \ l:pcat_output['ALL'], 
+          \ #{
+          \     idx:  printf(l:pcat_idx_fmt, i + 1), 
+          \     path: printf(l:pcat_path_fmt, l:relative_pcat, l:relative_path), 
+          \     item: l:output[i]
+          \  })
   endfor
 
-  return l:output
+  return l:pcat_output
 endfunction

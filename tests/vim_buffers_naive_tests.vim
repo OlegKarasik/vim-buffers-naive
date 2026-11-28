@@ -71,6 +71,10 @@ function! s:find_buffer_item_by_path(buffers, target_path) abort
   return {}
 endfunction
 
+function! s:get_all_items(categories) abort
+  return map(copy(a:categories.ALL), {_, v -> v.item})
+endfunction
+
 function! s:get_buffer_paths(buffers) abort
   let l:paths = []
   for l:item in a:buffers
@@ -142,7 +146,7 @@ function! s:test_get_file_buffers_collects_files_and_marks_active() abort
     execute 'edit ' . fnameescape(l:file_one)
     execute 'badd ' . fnameescape(l:file_two)
 
-    let l:buffers = vim_buffers_naive#buffers#GetFileBuffers([], win_getid())
+    let l:buffers = s:get_all_items(vim_buffers_naive#buffers#GetFileBuffers([], win_getid()))
     let l:item_one = s:find_buffer_item_by_path(l:buffers, l:file_one)
     let l:item_two = s:find_buffer_item_by_path(l:buffers, l:file_two)
 
@@ -175,7 +179,7 @@ function! s:test_get_file_buffers_reverses_without_previous_and_keeps_active_fir
     execute 'badd ' . fnameescape(l:file_three)
     execute 'buffer ' . bufnr(l:file_two)
 
-    let l:buffers = vim_buffers_naive#buffers#GetFileBuffers([], win_getid())
+    let l:buffers = s:get_all_items(vim_buffers_naive#buffers#GetFileBuffers([], win_getid()))
     let l:expected = [
           \ s:normalize_path(l:file_two),
           \ s:normalize_path(l:file_three),
@@ -214,14 +218,14 @@ function! s:test_get_file_buffers_merges_previous_and_prepends_new_reversed() ab
     execute 'badd ' . fnameescape(l:file_gamma)
     execute 'buffer ' . bufnr(l:file_beta)
 
-    let l:previous_buffers = vim_buffers_naive#buffers#GetFileBuffers([], win_getid())
+    let l:previous_buffers = s:get_all_items(vim_buffers_naive#buffers#GetFileBuffers([], win_getid()))
 
     execute 'silent! bwipeout! ' . bufnr(l:file_gamma)
     execute 'badd ' . fnameescape(l:file_delta)
     execute 'badd ' . fnameescape(l:file_epsilon)
     execute 'buffer ' . bufnr(l:file_alpha)
 
-    let l:buffers = vim_buffers_naive#buffers#GetFileBuffers(l:previous_buffers, win_getid())
+    let l:buffers = s:get_all_items(vim_buffers_naive#buffers#GetFileBuffers(l:previous_buffers, win_getid()))
     let l:expected = [
           \ s:normalize_path(l:file_alpha),
           \ s:normalize_path(l:file_epsilon),
@@ -251,18 +255,12 @@ function! s:test_get_file_buffers_rewrites_project_root_prefix() abort
     call writefile(['main'], l:file_path)
     execute 'edit ' . fnameescape(l:file_path)
 
-    let l:buffers = vim_buffers_naive#buffers#GetFileBuffers([], win_getid())
+    let l:buffers = s:get_all_items(vim_buffers_naive#buffers#GetFileBuffers([], win_getid()))
     let l:item = s:find_buffer_item_by_path(l:buffers, l:file_path)
 
-    let l:normalized_root = substitute(s:normalize_path(l:project_root), '[\/]\+$', '', '')
-    let l:normalized_path = s:normalize_path(l:file_path)
-    let l:expected_display_path = '$PROJECT' . l:normalized_path[strlen(l:normalized_root):]
-
     call assert_false(empty(l:item), 'Expected GetFileBuffers to include the project test file.')
-    call assert_equal(
-          \ l:expected_display_path,
-          \ l:item.display_path,
-          \ 'Expected display_path to replace the project root with $PROJECT label.')
+    call assert_equal('PROJECT', l:item.relative_pcat, 'Expected project root category.')
+    call assert_equal('src/main.txt', l:item.relative_path, 'Expected relative_path relative to the project root.')
   finally
     call s:reset_ui_state()
     call s:cleanup_directory(l:fixture_dir)
@@ -283,14 +281,12 @@ function! s:test_get_file_buffers_rewrites_worktree_root_prefix_as_project() abo
     call writefile(['main'], l:file_path)
     execute 'edit ' . fnameescape(l:file_path)
 
-    let l:buffers = vim_buffers_naive#buffers#GetFileBuffers([], win_getid())
+    let l:buffers = s:get_all_items(vim_buffers_naive#buffers#GetFileBuffers([], win_getid()))
     let l:item = s:find_buffer_item_by_path(l:buffers, l:file_path)
 
     call assert_false(empty(l:item), 'Expected GetFileBuffers to include the worktree test file.')
-    call assert_equal(
-          \ '$PROJECT/src/main.txt',
-          \ l:item.display_path,
-          \ 'Expected display_path to replace the worktree root with $PROJECT label.')
+    call assert_equal('PROJECT', l:item.relative_pcat, 'Expected worktree root to be a project category.')
+    call assert_equal('src/main.txt', l:item.relative_path, 'Expected relative_path relative to the worktree root.')
   finally
     call s:reset_ui_state()
     call s:cleanup_directory(l:fixture_dir)
@@ -312,40 +308,17 @@ function! s:test_get_file_buffers_prefers_cwd_prefix_inside_project() abort
     execute 'cd ' . fnameescape(l:cwd_root)
     execute 'edit ' . fnameescape(l:file_path)
 
-    let l:buffers = vim_buffers_naive#buffers#GetFileBuffers([], win_getid())
+    let l:buffers = s:get_all_items(vim_buffers_naive#buffers#GetFileBuffers([], win_getid()))
     let l:item = s:find_buffer_item_by_path(l:buffers, l:file_path)
 
-    let l:normalized_cwd = substitute(s:normalize_path(l:cwd_root), '[\/]\+$', '', '')
-    let l:normalized_path = s:normalize_path(l:file_path)
-    let l:expected_display_path = '$CWD' . l:normalized_path[strlen(l:normalized_cwd):]
-
     call assert_false(empty(l:item), 'Expected GetFileBuffers to include the nested project file.')
-    call assert_equal(
-          \ l:expected_display_path,
-          \ l:item.display_path,
-          \ 'Expected display_path to prefer $CWD when cwd is inside the project.')
+    call assert_equal('CWD', l:item.relative_pcat, 'Expected cwd category to win inside the project.')
+    call assert_equal('src/main.txt', l:item.relative_path, 'Expected relative_path relative to cwd.')
   finally
     execute 'cd ' . fnameescape(l:original_cwd)
     call s:reset_ui_state()
     call s:cleanup_directory(l:fixture_dir)
   endtry
-endfunction
-
-function! s:test_enrich_file_buffer_with_display_index_zero_pads_value() abort
-  call vim_buffers_naive#buffers#GetFileBuffers([], win_getid())
-  let l:EnrichFileBufferWithDisplayIndex = s:autoload_script_local_function('EnrichFileBufferWithDisplayIndex')
-
-  let l:item = {
-        \ 'bufnr': 1,
-        \ 'file_path': '/tmp/example.txt',
-        \ 'file_name': 'example.txt',
-        \ }
-  let l:enriched_item = call(l:EnrichFileBufferWithDisplayIndex, [l:item, 4, 15])
-
-  call assert_equal(
-        \ '04',
-        \ l:enriched_item.display_index,
-        \ 'Expected display_index to be zero-padded to total items width.')
 endfunction
 
 function! s:test_buffers_list_shows_empty_state_when_no_file_buffers() abort
@@ -355,8 +328,8 @@ function! s:test_buffers_list_shows_empty_state_when_no_file_buffers() abort
     let l:lines = s:get_popup_lines(l:popup_id)
     let l:title = get(popup_getoptions(l:popup_id), 'title', '')
 
-    call assert_equal(['0   No file buffers'], l:lines, 'Expected BuffersList empty state text.')
-    call assert_equal('Buffers List', l:title, 'Expected BuffersList popup title.')
+    call assert_equal(['No buffers'], l:lines, 'Expected BuffersList empty state text.')
+    call assert_equal('Buffers List: CWD PROJECT HOME [ALL]', l:title, 'Expected BuffersList popup title.')
   finally
     call s:close_all_popups()
     call s:wipe_file_buffers()
@@ -377,7 +350,7 @@ function! s:test_buffers_list_x_closes_highlighted_buffer() abort
     execute 'badd ' . fnameescape(l:file_two)
 
     let l:popup_id = s:open_buffers_list_popup()
-    let l:PopupFilter = s:autoload_script_local_function('PopupFilter')
+    let l:PopupFilter = s:autoload_script_local_function('OnPopupKeyPress')
     call call(l:PopupFilter, [l:popup_id, 'j'])
     call call(l:PopupFilter, [l:popup_id, 'x'])
 
@@ -410,7 +383,7 @@ function! s:test_buffers_list_capital_x_keeps_only_active_buffer() abort
     execute 'buffer ' . bufnr(l:file_one)
 
     let l:popup_id = s:open_buffers_list_popup()
-    let l:PopupFilter = s:autoload_script_local_function('PopupFilter')
+    let l:PopupFilter = s:autoload_script_local_function('OnPopupKeyPress')
     call call(l:PopupFilter, [l:popup_id, 'j'])
     call call(l:PopupFilter, [l:popup_id, 'X'])
 
@@ -440,7 +413,7 @@ function! s:test_buffers_list_enter_opens_selected_buffer() abort
     execute 'badd ' . fnameescape(l:file_two)
 
     let l:popup_id = s:open_buffers_list_popup()
-    let l:PopupFilter = s:autoload_script_local_function('PopupFilter')
+    let l:PopupFilter = s:autoload_script_local_function('OnPopupKeyPress')
     call call(l:PopupFilter, [l:popup_id, 'j'])
     call call(l:PopupFilter, [l:popup_id, "\<CR>"])
 
@@ -492,7 +465,7 @@ function! s:test_buffers_list_aligns_rows_with_multi_digit_indexes() abort
     let l:popup_id = s:open_buffers_list_popup()
 
     let l:lines = s:get_popup_lines(l:popup_id)
-    call assert_equal(10, len(l:lines), 'Expected at most 10 visible rows.')
+    call assert_equal(12, len(l:lines), 'Expected every buffer to be visible.')
     for l:line in l:lines
       call assert_match('^\d\d [ +][ *] \$CWD', l:line, 'Expected zero-padded index, flags column and path.')
     endfor
@@ -509,20 +482,20 @@ function! s:test_buffers_list_navigation_wraps_and_scrolls() abort
 
   try
     call s:reset_ui_state()
-    call s:open_many_buffers(l:fixture_dir, 13)
+    call s:open_many_buffers(l:fixture_dir, 18)
 
     let l:popup_id = s:open_buffers_list_popup()
-    let l:PopupFilter = s:autoload_script_local_function('PopupFilter')
+    let l:PopupFilter = s:autoload_script_local_function('OnPopupKeyPress')
 
     let l:lines = s:get_popup_lines(l:popup_id)
-    call assert_equal(10, len(l:lines), 'Expected at most 10 visible rows.')
-    call assert_match('^01  \* .*file13\.txt$', l:lines[0])
+    call assert_equal(15, len(l:lines), 'Expected at most 15 visible rows.')
+    call assert_match('^01  \* .*file18\.txt$', l:lines[0])
     call assert_equal(1, line('.', l:popup_id))
 
     call call(l:PopupFilter, [l:popup_id, 'k'])
     let l:lines = s:get_popup_lines(l:popup_id)
-    call assert_match('^13   .*file01\.txt$', l:lines[-1], 'Expected k on first row to wrap to last row.')
-    call assert_equal(10, line('.', l:popup_id))
+    call assert_match('^18   .*file01\.txt$', l:lines[-1], 'Expected k on first row to wrap to last row.')
+    call assert_equal(15, line('.', l:popup_id))
 
     call call(l:PopupFilter, [l:popup_id, "\<Down>"])
     let l:lines = s:get_popup_lines(l:popup_id)
@@ -545,10 +518,10 @@ function! s:test_buffers_list_esc_closes_popup_and_enter_opens_scrolled_selectio
 
   try
     call s:reset_ui_state()
-    call s:open_many_buffers(l:fixture_dir, 13)
+    call s:open_many_buffers(l:fixture_dir, 18)
 
     let l:popup_id = s:open_buffers_list_popup()
-    let l:PopupFilter = s:autoload_script_local_function('PopupFilter')
+    let l:PopupFilter = s:autoload_script_local_function('OnPopupKeyPress')
     call call(l:PopupFilter, [l:popup_id, "\<Esc>"])
     call assert_true(index(popup_list(), l:popup_id) < 0, 'Expected Esc to close popup.')
 
@@ -564,6 +537,124 @@ function! s:test_buffers_list_esc_closes_popup_and_enter_opens_scrolled_selectio
   endtry
 endfunction
 
+function! s:test_buffers_list_tabs_filter_by_category() abort
+  let l:fixture_dir = s:create_fixture_directory('tabs')
+  let l:home_dir = l:fixture_dir . '/home'
+  let l:cwd_dir = l:fixture_dir . '/cwd'
+  let l:project_dir = l:fixture_dir . '/project'
+  let l:home_file = l:home_dir . '/h.txt'
+  let l:cwd_file = l:cwd_dir . '/c.txt'
+  let l:project_file = l:project_dir . '/src/p.txt'
+  let l:original_cwd = getcwd()
+  let l:original_home = $HOME
+
+  try
+    call s:reset_ui_state()
+    call mkdir(l:home_dir, 'p')
+    call mkdir(l:cwd_dir, 'p')
+    call mkdir(l:project_dir . '/.git', 'p')
+    call mkdir(l:project_dir . '/src', 'p')
+    call writefile(['h'], l:home_file)
+    call writefile(['c'], l:cwd_file)
+    call writefile(['p'], l:project_file)
+    let $HOME = l:home_dir
+    execute 'cd ' . fnameescape(l:cwd_dir)
+
+    execute 'edit ' . fnameescape(l:home_file)
+    execute 'edit ' . fnameescape(l:project_file)
+    execute 'edit ' . fnameescape(l:cwd_file)
+
+    let l:popup_id = s:open_buffers_list_popup()
+    let l:PopupFilter = s:autoload_script_local_function('OnPopupKeyPress')
+    call assert_equal(3, len(s:get_popup_lines(l:popup_id)), 'Expected ALL tab to list every buffer.')
+
+    let l:expected = [
+          \ ['t', 'Buffers List: [CWD] PROJECT HOME ALL', ['1  * c.txt']],
+          \ ['t', 'Buffers List: CWD [PROJECT] HOME ALL', ['1    src/p.txt']],
+          \ ['t', 'Buffers List: CWD PROJECT [HOME] ALL', ['1    h.txt']],
+          \ ['t', 'Buffers List: CWD PROJECT HOME [ALL]', []],
+          \ ['T', 'Buffers List: CWD PROJECT [HOME] ALL', ['1    h.txt']],
+          \ ['T', 'Buffers List: CWD [PROJECT] HOME ALL', ['1    src/p.txt']],
+          \ ]
+    for [l:key, l:title, l:lines] in l:expected
+      call call(l:PopupFilter, [l:popup_id, l:key])
+      call assert_equal(l:title, popup_getoptions(l:popup_id).title, 'Expected title after ' . l:key)
+      if !empty(l:lines)
+        call assert_equal(l:lines, s:get_popup_lines(l:popup_id), 'Expected rows of tab ' . l:title)
+      endif
+    endfor
+
+    call call(l:PopupFilter, [l:popup_id, "\<CR>"])
+    call assert_equal(s:normalize_path(l:project_file), s:normalize_path(expand('%:p')), 'Expected Enter to open the active tab selection.')
+
+    let l:popup_id = s:open_buffers_list_popup()
+    call call(l:PopupFilter, [l:popup_id, 't'])
+    call call(l:PopupFilter, [l:popup_id, 'X'])
+    call assert_equal(0, buflisted(bufnr(l:cwd_file)), 'Expected X to close CWD tab buffers.')
+    call assert_equal(1, buflisted(bufnr(l:home_file)), 'Expected X to keep buffers of other tabs.')
+    call assert_equal(['No buffers'], s:get_popup_lines(l:popup_id), 'Expected empty CWD tab.')
+
+    call call(l:PopupFilter, [l:popup_id, 't'])
+    call call(l:PopupFilter, [l:popup_id, 't'])
+    call call(l:PopupFilter, [l:popup_id, 'x'])
+    call assert_equal(0, buflisted(bufnr(l:home_file)), 'Expected x to close the HOME tab selection.')
+    call assert_equal(1, buflisted(bufnr(l:project_file)), 'Expected x to keep the active buffer from other tab.')
+  finally
+    let $HOME = l:original_home
+    execute 'cd ' . fnameescape(l:original_cwd)
+    call s:close_all_popups()
+    call s:wipe_file_buffers()
+    call s:cleanup_directory(l:fixture_dir)
+  endtry
+endfunction
+
+function! s:test_get_file_buffers_sets_display_path_per_tab() abort
+  let l:fixture_dir = s:create_fixture_directory('display-path')
+  let l:project_root = l:fixture_dir . '/sample-project'
+  let l:file_path = l:project_root . '/src/main.txt'
+
+  try
+    call s:reset_ui_state()
+    call mkdir(l:project_root . '/.git', 'p')
+    call mkdir(fnamemodify(l:file_path, ':h'), 'p')
+    call writefile(['main'], l:file_path)
+    execute 'edit ' . fnameescape(l:file_path)
+
+    let l:result = vim_buffers_naive#buffers#GetFileBuffers([], win_getid())
+    let l:all = filter(copy(l:result.ALL), {_, v -> s:normalize_path(v.item.file_path) ==# s:normalize_path(l:file_path)})
+    let l:project = filter(copy(get(l:result, 'PROJECT', [])), {_, v -> s:normalize_path(v.item.file_path) ==# s:normalize_path(l:file_path)})
+
+    call assert_equal(1, len(l:all), 'Expected the file on the ALL tab.')
+    call assert_equal(1, len(l:project), 'Expected the file on the PROJECT tab.')
+    call assert_equal('$PROJECT/src/main.txt', l:all[0].path, 'Expected labeled path on the ALL tab.')
+    call assert_equal('src/main.txt', l:project[0].path, 'Expected relative path on the PROJECT tab.')
+  finally
+    call s:reset_ui_state()
+    call s:cleanup_directory(l:fixture_dir)
+  endtry
+endfunction
+
+function! s:test_buffers_list_popup_size_depends_on_screen_width() abort
+  let l:original_columns = &columns
+
+  try
+    call s:reset_ui_state()
+    for [l:columns, l:width] in [[200, 150], [150, 150], [100, 80]]
+      let &columns = l:columns
+      let l:popup_id = s:open_buffers_list_popup()
+      let l:options = popup_getoptions(l:popup_id)
+      call assert_equal(l:width, l:options.minwidth, 'Expected popup width for ' . l:columns . ' columns.')
+      call assert_equal(l:width, l:options.maxwidth, 'Expected fixed popup width for ' . l:columns . ' columns.')
+      call assert_equal(15, l:options.minheight, 'Expected fixed popup height.')
+      call assert_equal(15, l:options.maxheight, 'Expected fixed popup height.')
+      call popup_close(l:popup_id)
+    endfor
+  finally
+    let &columns = l:original_columns
+    call s:close_all_popups()
+  endtry
+endfunction
+
 function! VimBuffersNaiveTestRunAll() abort
   call s:test_buffers_list_command_is_defined()
   call s:test_buffers_list_plug_mapping_is_defined()
@@ -574,7 +665,6 @@ function! VimBuffersNaiveTestRunAll() abort
   call s:test_get_file_buffers_rewrites_project_root_prefix()
   call s:test_get_file_buffers_rewrites_worktree_root_prefix_as_project()
   call s:test_get_file_buffers_prefers_cwd_prefix_inside_project()
-  call s:test_enrich_file_buffer_with_display_index_zero_pads_value()
   call s:test_buffers_list_shows_empty_state_when_no_file_buffers()
   call s:test_buffers_list_x_closes_highlighted_buffer()
   call s:test_buffers_list_capital_x_keeps_only_active_buffer()
@@ -583,5 +673,8 @@ function! VimBuffersNaiveTestRunAll() abort
   call s:test_buffers_list_aligns_rows_with_multi_digit_indexes()
   call s:test_buffers_list_navigation_wraps_and_scrolls()
   call s:test_buffers_list_esc_closes_popup_and_enter_opens_scrolled_selection()
+  call s:test_buffers_list_tabs_filter_by_category()
+  call s:test_get_file_buffers_sets_display_path_per_tab()
+  call s:test_buffers_list_popup_size_depends_on_screen_width()
   call s:cleanup_directory(s:repo_root . '/tests/tmp')
 endfunction
