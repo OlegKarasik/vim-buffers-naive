@@ -312,7 +312,7 @@ function! s:test_get_file_buffers_prefers_cwd_prefix_inside_project() abort
     let l:item = s:find_buffer_item_by_path(l:buffers, l:file_path)
 
     call assert_false(empty(l:item), 'Expected GetFileBuffers to include the nested project file.')
-    call assert_equal('CWD', l:item.relative_pcat, 'Expected cwd category to win inside the project.')
+    call assert_equal('PWD', l:item.relative_pcat, 'Expected cwd category to win inside the project.')
     call assert_equal('src/main.txt', l:item.relative_path, 'Expected relative_path relative to cwd.')
   finally
     execute 'cd ' . fnameescape(l:original_cwd)
@@ -329,7 +329,7 @@ function! s:test_buffers_list_shows_empty_state_when_no_file_buffers() abort
     let l:title = get(popup_getoptions(l:popup_id), 'title', '')
 
     call assert_equal(['No buffers'], l:lines, 'Expected BuffersList empty state text.')
-    call assert_equal('Buffers List: CWD PROJECT HOME [ALL]', l:title, 'Expected BuffersList popup title.')
+    call assert_equal('Buffers List: PWD PROJECT HOME [ALL]', l:title, 'Expected BuffersList popup title.')
   finally
     call s:close_all_popups()
     call s:wipe_file_buffers()
@@ -467,10 +467,10 @@ function! s:test_buffers_list_aligns_rows_with_multi_digit_indexes() abort
     let l:lines = s:get_popup_lines(l:popup_id)
     call assert_equal(12, len(l:lines), 'Expected every buffer to be visible.')
     for l:line in l:lines
-      call assert_match('^\d\d [ +][ *] \$CWD', l:line, 'Expected zero-padded index, flags column and path.')
+      call assert_match('^\d\d [ +][ *] tests/', l:line, 'Expected zero-padded index, flags column and path.')
     endfor
     call assert_match('^01 +\* ', l:lines[0], 'Expected modified active row to show +*.')
-    call assert_equal(1, len(uniq(map(copy(l:lines), 'stridx(v:val, "$CWD")'))), 'Expected paths to start in the same column.')
+    call assert_equal(1, len(uniq(map(copy(l:lines), 'stridx(v:val, "tests/")'))), 'Expected paths to start in the same column.')
     call popup_close(l:popup_id)
   finally
     call s:cleanup_directory(l:fixture_dir)
@@ -566,15 +566,15 @@ function! s:test_buffers_list_tabs_filter_by_category() abort
 
     let l:popup_id = s:open_buffers_list_popup()
     let l:PopupFilter = s:autoload_script_local_function('OnPopupKeyPress')
-    call assert_equal(3, len(s:get_popup_lines(l:popup_id)), 'Expected ALL tab to list every buffer.')
+    call assert_equal('Buffers List: [PWD] PROJECT HOME ALL', popup_getoptions(l:popup_id).title, 'Expected popup to open on the active file tab.')
+    call assert_equal(['1  * c.txt'], s:get_popup_lines(l:popup_id), 'Expected rows of the active file tab.')
 
     let l:expected = [
-          \ ['t', 'Buffers List: [CWD] PROJECT HOME ALL', ['1  * c.txt']],
-          \ ['t', 'Buffers List: CWD [PROJECT] HOME ALL', ['1    src/p.txt']],
-          \ ['t', 'Buffers List: CWD PROJECT [HOME] ALL', ['1    h.txt']],
-          \ ['t', 'Buffers List: CWD PROJECT HOME [ALL]', []],
-          \ ['T', 'Buffers List: CWD PROJECT [HOME] ALL', ['1    h.txt']],
-          \ ['T', 'Buffers List: CWD [PROJECT] HOME ALL', ['1    src/p.txt']],
+          \ ['t', 'Buffers List: PWD [PROJECT] HOME ALL', ['1    src/p.txt']],
+          \ ['t', 'Buffers List: PWD PROJECT [HOME] ALL', ['1    h.txt']],
+          \ ['t', 'Buffers List: PWD PROJECT HOME [ALL]', ['1  * $PWD/c.txt', '2    $PROJECT/src/p.txt', '3    $HOME/h.txt']],
+          \ ['T', 'Buffers List: PWD PROJECT [HOME] ALL', ['1    h.txt']],
+          \ ['T', 'Buffers List: PWD [PROJECT] HOME ALL', ['1    src/p.txt']],
           \ ]
     for [l:key, l:title, l:lines] in l:expected
       call call(l:PopupFilter, [l:popup_id, l:key])
@@ -588,11 +588,12 @@ function! s:test_buffers_list_tabs_filter_by_category() abort
     call assert_equal(s:normalize_path(l:project_file), s:normalize_path(expand('%:p')), 'Expected Enter to open the active tab selection.')
 
     let l:popup_id = s:open_buffers_list_popup()
-    call call(l:PopupFilter, [l:popup_id, 't'])
+    call assert_equal('Buffers List: PWD [PROJECT] HOME ALL', popup_getoptions(l:popup_id).title, 'Expected popup to open on the active file tab.')
+    call call(l:PopupFilter, [l:popup_id, 'T'])
     call call(l:PopupFilter, [l:popup_id, 'X'])
-    call assert_equal(0, buflisted(bufnr(l:cwd_file)), 'Expected X to close CWD tab buffers.')
+    call assert_equal(0, buflisted(bufnr(l:cwd_file)), 'Expected X to close PWD tab buffers.')
     call assert_equal(1, buflisted(bufnr(l:home_file)), 'Expected X to keep buffers of other tabs.')
-    call assert_equal(['No buffers'], s:get_popup_lines(l:popup_id), 'Expected empty CWD tab.')
+    call assert_equal(['No buffers'], s:get_popup_lines(l:popup_id), 'Expected empty PWD tab.')
 
     call call(l:PopupFilter, [l:popup_id, 't'])
     call call(l:PopupFilter, [l:popup_id, 't'])
@@ -639,7 +640,7 @@ function! s:test_buffers_list_popup_size_depends_on_screen_width() abort
 
   try
     call s:reset_ui_state()
-    for [l:columns, l:width] in [[200, 150], [150, 150], [100, 80]]
+    for [l:columns, l:width] in [[200, 60], [60, 60], [50, 30]]
       let &columns = l:columns
       let l:popup_id = s:open_buffers_list_popup()
       let l:options = popup_getoptions(l:popup_id)

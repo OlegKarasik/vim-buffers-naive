@@ -85,7 +85,7 @@ function! s:EnrichFileBufferWithRelativePath(item) abort
 
   let l:shortcuts = [
         \ a:item.home_path,    'HOME',
-        \ a:item.cwd_path,     'CWD',
+        \ a:item.cwd_path,     'PWD',
         \ a:item.project_path, 'PROJECT'
         \ ]
 

@@ -1,15 +1,15 @@
 scriptencoding utf-8
 
-let s:constant_tabs = ['CWD', 'PROJECT', 'HOME', 'ALL']
+let s:constant_tabs = ['PWD', 'PROJECT', 'HOME', 'ALL']
 let s:constant_titles = [
-      \ 'Buffers List: [CWD] PROJECT HOME ALL',
-      \ 'Buffers List: CWD [PROJECT] HOME ALL',
-      \ 'Buffers List: CWD PROJECT [HOME] ALL',
-      \ 'Buffers List: CWD PROJECT HOME [ALL]',
+      \ 'Buffers List: [PWD] PROJECT HOME ALL',
+      \ 'Buffers List: PWD [PROJECT] HOME ALL',
+      \ 'Buffers List: PWD PROJECT [HOME] ALL',
+      \ 'Buffers List: PWD PROJECT HOME [ALL]',
       \ ]
 let s:constant_all_tab_idx = index(s:constant_tabs, 'ALL')
 let s:constant_empty_text = 'No buffers'
-let s:constant_popup_width = 150
+let s:constant_popup_width = 60
 let s:constant_popup_width_margin = 20
 let s:constant_popup_height = 15
 
@@ -250,9 +250,18 @@ function! s:OpenPopup() abort
         \ }))
 
   call win_execute(s:popup_id, 'setlocal winhighlight=Normal:Pmenu,CursorLine:PmenuSel')
-  call win_execute(s:popup_id, "call matchadd('String', '\\v\\$(PROJECT|CWD|HOME)')")
+  call win_execute(s:popup_id, "call matchadd('String', '\\v\\$(PROJECT|PWD|HOME)')")
 
   call s:BuildLines()
+
+  " Open on the tab of the active file (always first on ALL); unlabeled opens ALL.
+  if !empty(s:all_buffers.ALL)
+    let l:pcat = s:all_buffers.ALL[0].item.relative_pcat
+    if !empty(l:pcat)
+      let s:tab_idx = index(s:constant_tabs, l:pcat)
+    endif
+  endif
+
   call s:RenderPopup()
 endfunction
 
